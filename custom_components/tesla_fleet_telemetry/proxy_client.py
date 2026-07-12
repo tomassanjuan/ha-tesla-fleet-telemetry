@@ -95,51 +95,51 @@ def _format_fleet_error_data(data: Any) -> str | None:
     return str(data)
 
 
-def _map_fleet_exception(err: TeslaFleetError) -> HomeAssistantError:
-    """Map a package exception to a HA-friendly error, preserving Tags for interval parsing."""
-    data = getattr(err, "data", None)
-    if isinstance(err, RateLimited):
-        data = data or {}
-        retry_after = RATE_LIMIT_RETRY_AFTER_DEFAULT_SECONDS
-        if isinstance(data, dict):
-            try:
-                retry_after = int(data.get("after") or retry_after)
-            except (ValueError, TypeError):
-                pass
-        return RateLimitedError(retry_after)
+def _map_rate_limited(err: RateLimited) -> RateLimitedError:
+    data = getattr(err, "data", None) or {}
+    retry_after = RATE_LIMIT_RETRY_AFTER_DEFAULT_SECONDS
+    if isinstance(data, dict):
+        try:
+            retry_after = int(data.get("after") or retry_after)
+        except (ValueError, TypeError):
+            pass
+    return RateLimitedError(retry_after)
 
-    if isinstance(err, OAuthExpired | LoginRequired):
-        # If Tesla rejected an interval (Tags in data), preserve the JSON so
-        # extract_unsupported_interval can parse it from the exception message.
-        if isinstance(data, dict) and "Tags" in data:
-            safe_data = {k: v for k, v in (data or {}).items() if k in ("Tags", "Status")}
-            return HomeAssistantError(json.dumps(safe_data, default=str)[:200])
-        return TokenRevokedError(str(err))
 
+def _map_auth_error(err: TeslaFleetError, data: Any) -> HomeAssistantError:
+    # If Tesla rejected an interval (Tags in data), preserve the JSON so
+    # extract_unsupported_interval can parse it from the exception message.
+    if isinstance(data, dict) and "Tags" in data:
+        safe_data = {k: v for k, v in data.items() if k in ("Tags", "Status")}
+        return HomeAssistantError(json.dumps(safe_data, default=str)[:200])
+    return TokenRevokedError(str(err))
+
+
+def _map_known_fleet_error(err: TeslaFleetError) -> HomeAssistantError | None:
+    """Map exception types with a fixed, user-friendly message. None if unmapped."""
     if isinstance(err, VehicleOffline):
         # Message must contain an _ASLEEP_MARKERS substring so CommandEntity's
         # wake-and-retry logic recognizes this as a real HTTP 408.
         return HomeAssistantError("Vehicle is offline (asleep) — waking up may help")
-
     if isinstance(err, Forbidden | InvalidScope):
         return HomeAssistantError(
             "Tesla rejected the request — missing OAuth scope. "
             "Re-authenticate and grant vehicle command permissions."
         )
-
     if isinstance(err, Locked):
         return HomeAssistantError("Tesla account is locked — contact Tesla support to unlock it")
-
     if isinstance(err, PaymentRequired):
         return HomeAssistantError(
             "Tesla Fleet API requires payment for this request (non-free account tier)"
         )
-
     if isinstance(err, DeviceUnexpectedResponse):
         return HomeAssistantError(
             "Vehicle responded with an error — it may need a reboot, OTA update, or service"
         )
+    return None
 
+
+def _map_unknown_fleet_error(err: TeslaFleetError, data: Any) -> HomeAssistantError:
     # Catch-all for unmapped exceptions: include type name for debugging (issue #39)
     err_type = type(err).__name__
     err_msg = str(err)[:100]  # Truncate long error messages for logs
@@ -148,6 +148,19 @@ def _map_fleet_exception(err: TeslaFleetError) -> HomeAssistantError:
     if detail and detail not in err_msg:
         return HomeAssistantError(f"Fleet API error ({err_type}): {err_msg} ({detail})")
     return HomeAssistantError(f"Fleet API error ({err_type}): {err_msg}")
+
+
+def _map_fleet_exception(err: TeslaFleetError) -> HomeAssistantError:
+    """Map a package exception to a HA-friendly error, preserving Tags for interval parsing."""
+    data = getattr(err, "data", None)
+    if isinstance(err, RateLimited):
+        return _map_rate_limited(err)
+    if isinstance(err, OAuthExpired | LoginRequired):
+        return _map_auth_error(err, data)
+    known = _map_known_fleet_error(err)
+    if known is not None:
+        return known
+    return _map_unknown_fleet_error(err, data)
 
 
 def _check_command_result(data: dict[str, Any]) -> None:

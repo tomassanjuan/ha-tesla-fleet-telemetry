@@ -146,7 +146,9 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
         return val.strip().strip('"').strip("'").strip()
 
 
-class _DoorBinarySensorBase(CoordinatorEntity[TelemetryCoordinator], RestoreEntity, BinarySensorEntity):
+class _DoorBinarySensorBase(
+    CoordinatorEntity[TelemetryCoordinator], RestoreEntity, BinarySensorEntity
+):
     """Shared restore-on-reload logic for DoorState-derived binary sensors."""
 
     def __init__(self, coordinator: TelemetryCoordinator) -> None:
@@ -163,7 +165,9 @@ class _DoorBinarySensorBase(CoordinatorEntity[TelemetryCoordinator], RestoreEnti
     def available(self) -> bool:
         if not self.coordinator.last_update_success:
             return False
-        return self.coordinator.get_field("DoorState") is not None or self._restored_is_on is not None
+        return (
+            self.coordinator.get_field("DoorState") is not None or self._restored_is_on is not None
+        )
 
 
 class TeslaDoorStateBinarySensor(_DoorBinarySensorBase):
