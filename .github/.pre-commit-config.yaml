@@ -8,7 +8,7 @@ repos:
         args: [--config, .github/cicd/pyproject.toml]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
