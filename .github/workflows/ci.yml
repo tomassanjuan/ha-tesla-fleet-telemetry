@@ -46,10 +46,16 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           extra-packages: "yamllint"
-      - name: Run pre-commit
-        uses: pre-commit/action@v3.0.1
+      - name: Cache pre-commit envs
+        uses: actions/cache@v6
         with:
-          extra_args: --config .github/.pre-commit-config.yaml --all-files
+          path: ~/.cache/pre-commit
+          key: pre-commit-3|${{ env.PYTHON_VERSION }}|${{ hashFiles('.github/.pre-commit-config.yaml') }}
+      - name: Run pre-commit
+        shell: bash
+        run: |
+          python -m pip install pre-commit
+          pre-commit run --show-diff-on-failure --color=always --config .github/.pre-commit-config.yaml --all-files
       - name: Validate JSON & manifest
         shell: bash
         run: python .github/cicd/validate_files.py
