@@ -46,25 +46,25 @@ async def async_setup_entry(
 
 _KEEPER_PRESET_TO_MODE = {
     PRESET_NONE: 0,
-    "Keep": 1,
-    "Dog": 2,
-    "Camp": 3,
+    "keep": 1,
+    "dog": 2,
+    "camp": 3,
 }
 
-_PRESET_DEFROST = "Defrost"
+_PRESET_DEFROST = "defrost"
 
 # Telemetry enum suffixes → preset names (after stripping "ClimateKeeperMode" prefix)
 _KEEPER_ENUM_TO_PRESET = {
     "off": PRESET_NONE,
-    "on": "Keep",
-    "keep": "Keep",
-    "keepmode": "Keep",
-    "dog": "Dog",
-    "dogmode": "Dog",
-    "camp": "Camp",
-    "party": "Camp",
-    "partymode": "Camp",
-    "campmode": "Camp",
+    "on": "keep",
+    "keep": "keep",
+    "keepmode": "keep",
+    "dog": "dog",
+    "dogmode": "dog",
+    "camp": "camp",
+    "party": "camp",
+    "partymode": "camp",
+    "campmode": "camp",
 }
 
 _COP_TEMP_LIMITS = {
@@ -108,7 +108,7 @@ class TeslaClimate(CommandEntity, ClimateEntity):
     _attr_min_temp = 15.0
     _attr_max_temp = 28.0
     _attr_target_temperature_step = 0.5
-    _attr_preset_modes = [PRESET_NONE, "Keep", "Dog", "Camp", _PRESET_DEFROST]
+    _attr_preset_modes = [PRESET_NONE, "keep", "dog", "camp", _PRESET_DEFROST]
     _attr_entity_registry_enabled_default = True
 
     def __init__(self, coordinator, vin, proxy_client, impl, entry) -> None:
@@ -125,9 +125,9 @@ class TeslaClimate(CommandEntity, ClimateEntity):
         preset = self.preset_mode
         if preset == _PRESET_DEFROST:
             return "mdi:car-defrost-front"
-        if preset == "Dog":
+        if preset == "dog":
             return "mdi:dog"
-        if preset == "Camp":
+        if preset == "camp":
             return "mdi:campfire"
         if self.hvac_mode == HVACMode.OFF:
             return "mdi:fan-off"

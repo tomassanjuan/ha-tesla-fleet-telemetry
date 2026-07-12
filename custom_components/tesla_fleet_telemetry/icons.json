@@ -6,10 +6,10 @@
           "preset_mode": {
             "state": {
               "none": "mdi:fan-off",
-              "Keep": "mdi:home-thermometer",
-              "Dog": "mdi:dog",
-              "Camp": "mdi:campfire",
-              "Defrost": "mdi:car-defrost-front"
+              "keep": "mdi:home-thermometer",
+              "dog": "mdi:dog",
+              "camp": "mdi:campfire",
+              "defrost": "mdi:car-defrost-front"
             }
           }
         }

@@ -2,7 +2,6 @@
   "domain": "tesla_fleet_telemetry",
   "name": "Tesla Fleet Telemetry",
   "version": "1.0.0",
-  "icon": "mdi:car-electric",
   "config_flow": true,
   "documentation": "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry",
   "issue_tracker": "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry/issues",
@@ -13,7 +12,6 @@
   ],
   "dependencies": ["application_credentials", "auth"],
   "codeowners": ["@tomassanjuan"],
-  "homeassistant": "2025.12.5",
   "integration_type": "hub",
   "iot_class": "local_push"
 }
