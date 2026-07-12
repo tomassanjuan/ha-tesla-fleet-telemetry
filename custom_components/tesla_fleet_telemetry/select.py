@@ -25,7 +25,7 @@ _LEVEL_TO_OPTION = {
 }
 _OPTION_TO_LEVEL = {label: level for level, label in _LEVEL_TO_OPTION.items()}
 
-_WHEEL_LEVEL_TO_OPTION = {1: "Off", 2: "Low", 3: "High"}
+_WHEEL_LEVEL_TO_OPTION = {0: "Off", 1: "Low", 3: "High"}
 _WHEEL_OPTION_TO_LEVEL = {label: level for level, label in _WHEEL_LEVEL_TO_OPTION.items()}
 
 _HEAT_PREFIX = "Heat "
