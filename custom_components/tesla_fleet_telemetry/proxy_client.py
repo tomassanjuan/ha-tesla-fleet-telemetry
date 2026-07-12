@@ -12,10 +12,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from tesla_fleet_api.const import Method
 from tesla_fleet_api.exceptions import (
+    DeviceUnexpectedResponse,
+    Forbidden,
+    InvalidScope,
+    Locked,
     LoginRequired,
     OAuthExpired,
+    PaymentRequired,
     RateLimited,
     TeslaFleetError,
+    VehicleOffline,
 )
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 from tesla_fleet_api.tesla.vehicle.fleet import VehicleFleet
@@ -109,6 +115,30 @@ def _map_fleet_exception(err: TeslaFleetError) -> HomeAssistantError:
             safe_data = {k: v for k, v in (data or {}).items() if k in ("Tags", "Status")}
             return HomeAssistantError(json.dumps(safe_data, default=str)[:200])
         return TokenRevokedError(str(err))
+
+    if isinstance(err, VehicleOffline):
+        # Message must contain an _ASLEEP_MARKERS substring so CommandEntity's
+        # wake-and-retry logic recognizes this as a real HTTP 408.
+        return HomeAssistantError("Vehicle is offline (asleep) — waking up may help")
+
+    if isinstance(err, Forbidden | InvalidScope):
+        return HomeAssistantError(
+            "Tesla rejected the request — missing OAuth scope. "
+            "Re-authenticate and grant vehicle command permissions."
+        )
+
+    if isinstance(err, Locked):
+        return HomeAssistantError("Tesla account is locked — contact Tesla support to unlock it")
+
+    if isinstance(err, PaymentRequired):
+        return HomeAssistantError(
+            "Tesla Fleet API requires payment for this request (non-free account tier)"
+        )
+
+    if isinstance(err, DeviceUnexpectedResponse):
+        return HomeAssistantError(
+            "Vehicle responded with an error — it may need a reboot, OTA update, or service"
+        )
 
     # Catch-all for unmapped exceptions: include type name for debugging (issue #39)
     err_type = type(err).__name__
