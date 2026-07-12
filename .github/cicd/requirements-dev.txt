@@ -6,7 +6,7 @@ paho-mqtt>=2.1.0,<3
 tesla-fleet-api==1.4.7
 
 # Home Assistant (for type hints)
-homeassistant>=2026.6.0
+homeassistant>=2026.0.0
 
 # Transitive deps pulled in by homeassistant / pytest-homeassistant-custom-component,
 # pinned to patched versions to satisfy the weekly pip-audit CVE scan.
