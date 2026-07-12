@@ -95,7 +95,11 @@ async def test_reauth_entry_updated_without_forced_reload(hass: HomeAssistant) -
     entry.add_to_hass(hass)
 
     reloaded = []
-    entry.add_update_listener(lambda h, e: reloaded.append(e.data["token"]["access_token"]))
+
+    async def _on_update(h: HomeAssistant, e) -> None:
+        reloaded.append(e.data["token"]["access_token"])
+
+    entry.add_update_listener(_on_update)
 
     hass.config_entries.async_update_entry(
         entry, data={**entry.data, "token": {"access_token": "new-token", "expires_at": 9999999999}}
