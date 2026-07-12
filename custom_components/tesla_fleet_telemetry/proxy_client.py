@@ -417,59 +417,32 @@ class TeslaProxyClient:
                     dict[str, Any],
                     await v.navigation_gps_request(lat, lon, body.get("order")),
                 )
-            case "remote_auto_seat_climate_request":
-                auto_seat_position = body.get("auto_seat_position")
-                auto_climate_on = body.get("auto_climate_on")
-                if auto_seat_position is None or auto_climate_on is None:
-                    raise HomeAssistantError(
-                        "Missing auto_seat_position/auto_climate_on in remote_auto_seat_climate_request"
-                    )
-                return cast(
-                    dict[str, Any],
-                    await v.remote_auto_seat_climate_request(auto_seat_position, auto_climate_on),
-                )
-            case "remote_auto_steering_wheel_heat_climate_request":
-                on_value = body.get("on")
-                if on_value is None:
-                    raise HomeAssistantError(
-                        "Missing on in remote_auto_steering_wheel_heat_climate_request"
-                    )
-                return cast(
-                    dict[str, Any],
-                    await v.remote_auto_steering_wheel_heat_climate_request(on_value),
-                )
             case "remote_boombox":
                 # HA sends sound_id; package expects sound — accept either key.
                 sound = body.get("sound", body.get("sound_id", 0))
                 return cast(dict[str, Any], await v.remote_boombox(sound))
-            case "remote_seat_cooler_request":
+            case (
+                "remote_auto_seat_climate_request"
+                | "remote_auto_steering_wheel_heat_climate_request"
+                | "remote_seat_cooler_request"
+                | "remote_seat_heater_request"
+                | "remote_steering_wheel_heat_level_request"
+                | "remote_steering_wheel_heater_request"
+            ):
+                # The signed Vehicle Command Protocol path (tesla-fleet-api's
+                # wrapper methods) rejects these with InvalidRequest/InvalidCommand
+                # on some vehicles — send plain JSON through the proxy's REST
+                # passthrough instead, using Tesla's documented wire-format values.
                 return cast(
                     dict[str, Any],
-                    await v.remote_seat_cooler_request(
-                        body["seat_position"], body["seat_cooler_level"]
+                    await a._request(
+                        Method.POST,
+                        f"{FLEET_API_VERSION}/vehicles/{self._vin}/command/{endpoint}",
+                        json=body,
                     ),
-                )
-            case "remote_seat_heater_request":
-                # HA sends {heater, level}; package serialises as the same keys.
-                heater = body.get("heater", body.get("seat_position"))
-                if heater is None:
-                    raise HomeAssistantError("Missing heater in remote_seat_heater_request")
-                return cast(
-                    dict[str, Any],
-                    await v.remote_seat_heater_request(heater, body["level"]),
                 )
             case "remote_start_drive":
                 return cast(dict[str, Any], await v.remote_start_drive())
-            case "remote_steering_wheel_heat_level_request":
-                return cast(
-                    dict[str, Any],
-                    await v.remote_steering_wheel_heat_level_request(body["level"]),
-                )
-            case "remote_steering_wheel_heater_request":
-                return cast(
-                    dict[str, Any],
-                    await v.remote_steering_wheel_heater_request(body["on"]),
-                )
             case "schedule_software_update":
                 return cast(
                     dict[str, Any],

@@ -91,15 +91,16 @@ def test_number_entity(coordinator: TelemetryCoordinator, config_entry: ConfigEn
     _assert_common(entity, "charge_limit")
 
 
-def test_seat_select_defs_use_zero_based_seat_indices() -> None:
-    """tesla-fleet-api indexes front-left/front-right as 0/1 into its position
-    tuple, not the raw Tesla protobuf enum values (1/2) — mixing these up
-    causes an IndexError (front-right) or a wrong-seat command (front-left).
+def test_seat_select_defs_use_documented_wire_seat_indices() -> None:
+    """remote_seat_cooler_request/remote_auto_seat_climate_request go out as
+    plain JSON through the proxy (see proxy_client._dispatch_command), so the
+    values here must match Tesla's documented wire format directly: seat
+    position 1=front left, 2=front right (unlike seat_heater's 0/1).
     """
     from custom_components.tesla_fleet_telemetry.select import SEAT_SELECT_DEFS
 
     by_key = {d.key: d for d in SEAT_SELECT_DEFS}
-    assert by_key["seat_heater_front_left"].cooler_seat_value == 0
-    assert by_key["seat_heater_front_right"].cooler_seat_value == 1
-    assert by_key["seat_heater_front_left"].auto_seat_position == 0
-    assert by_key["seat_heater_front_right"].auto_seat_position == 1
+    assert by_key["seat_heater_front_left"].cooler_seat_value == 1
+    assert by_key["seat_heater_front_right"].cooler_seat_value == 2
+    assert by_key["seat_heater_front_left"].auto_seat_position == 1
+    assert by_key["seat_heater_front_right"].auto_seat_position == 2
