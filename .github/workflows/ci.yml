@@ -31,14 +31,69 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  PYTHON_VERSION: "3.13.2"
+
 jobs:
-  ci:
-    name: CI Pipeline
+  lint:
+    name: Lint & pre-commit
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - name: Run CI pipeline
-        uses: ./.github/actions/run-ci-pipeline
+      - name: Set up CI Python
+        uses: ./.github/actions/setup-ci-python
         with:
-          python-version: "3.13.2"
+          python-version: ${{ env.PYTHON_VERSION }}
+          extra-packages: "yamllint"
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --config .github/.pre-commit-config.yaml --all-files
+      - name: Validate JSON & manifest
+        shell: bash
+        run: python .github/cicd/validate_files.py
+      - name: Validate YAML
+        shell: bash
+        run: yamllint -c .github/.yamllint.yml .
+
+  hassfest:
+    name: Home Assistant hassfest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run hassfest
+        uses: home-assistant/actions/hassfest@master
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up CI Python
+        uses: ./.github/actions/setup-ci-python
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Run tests
+        shell: bash
+        run: |
+          pytest -c .github/cicd/pyproject.toml tests/ -v \
+            --cov=custom_components/tesla_fleet_telemetry \
+            --cov-report=term-missing --cov-report=xml
+
+  pip-audit:
+    name: CVE scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up CI Python
+        uses: ./.github/actions/setup-ci-python
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          extra-packages: "pip-audit"
+      - name: Run pip-audit for CVE detection
+        shell: bash
+        run: pip-audit --desc
