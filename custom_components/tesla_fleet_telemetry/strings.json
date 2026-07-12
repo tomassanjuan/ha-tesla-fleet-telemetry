@@ -120,18 +120,9 @@
           }
         },
         "abort": {
-          "entry_not_found": {
-            "title": "Integration Entry Not Found",
-            "description": "Could not find the Tesla Fleet Telemetry integration entry for this vehicle."
-          },
-          "still_not_paired": {
-            "title": "Virtual Key Not Yet Paired",
-            "description": "The virtual key for **{vin}** is still not paired. Open the Tesla app and pair the key, then click Fix again.\n\n[Pair key]({pairing_url})"
-          },
-          "repair_failed": {
-            "title": "Repair Check Failed",
-            "description": "Failed to check the virtual key pairing status. Ensure your telemetry server is reachable and try again."
-          }
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry integration entry for this vehicle.",
+          "still_not_paired": "The virtual key for **{vin}** is still not paired. Open the Tesla app and pair the key, then click Fix again.\n\n[Pair key]({pairing_url})",
+          "repair_failed": "Failed to check the virtual key pairing status. Ensure your telemetry server is reachable and try again."
         }
       }
     },
