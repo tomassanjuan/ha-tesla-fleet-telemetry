@@ -112,7 +112,6 @@
   "issues": {
     "key_not_paired": {
       "title": "Tesla Virtual Key Not Paired — {vin}",
-      "description": "Vehicle **{vin}** reports the virtual key is not paired. Vehicle commands will be rejected until the key is paired.\n\nOpen the Tesla app and scan the QR code or tap **Learn more** to pair the key. Then click the **Fix** button to verify the pairing and sync the configuration.\n\n[![QR Code — tap to open pairing link]({qr_url})]({pairing_url})",
       "fix_flow": {
         "step": {
           "confirm": {
@@ -138,7 +137,6 @@
     },
     "unknown_telemetry_field": {
       "title": "Unknown Telemetry Field — {vin}",
-      "description": "Vehicle **{vin}** reported an unknown telemetry field: `{field}`\n\nThis field is likely not supported by your vehicle or the Tesla Fleet Telemetry API. The field is not being streamed, but disable the related entity to clear this issue.",
       "fix_flow": {
         "step": {
           "init": {
