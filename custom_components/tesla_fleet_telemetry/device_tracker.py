@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import TelemetryCoordinator
@@ -34,7 +35,7 @@ async def async_setup_entry(
     async_add_entities(TeslaLocationTracker(coordinator, vin, *args) for args in _TRACKERS)
 
 
-class TeslaLocationTracker(CoordinatorEntity[TelemetryCoordinator], TrackerEntity):
+class TeslaLocationTracker(CoordinatorEntity[TelemetryCoordinator], TrackerEntity, RestoreEntity):
     """GPS device tracker fed by one telemetry location field."""
 
     _attr_has_entity_name = True
@@ -55,6 +56,15 @@ class TeslaLocationTracker(CoordinatorEntity[TelemetryCoordinator], TrackerEntit
         self._attr_name = name
         self._attr_icon = icon
         self._attr_unique_id = telemetry_unique_id(vin, unique_suffix)
+        self._restored_lat: float | None = None
+        self._restored_lon: float | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None:
+            self._restored_lat = last_state.attributes.get("latitude")
+            self._restored_lon = last_state.attributes.get("longitude")
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -69,14 +79,14 @@ class TeslaLocationTracker(CoordinatorEntity[TelemetryCoordinator], TrackerEntit
         loc = self.coordinator.get_field(self._field)
         if isinstance(loc, dict):
             return loc.get("latitude")
-        return None
+        return self._restored_lat
 
     @property
     def longitude(self) -> float | None:
         loc = self.coordinator.get_field(self._field)
         if isinstance(loc, dict):
             return loc.get("longitude")
-        return None
+        return self._restored_lon
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -94,4 +104,6 @@ class TeslaLocationTracker(CoordinatorEntity[TelemetryCoordinator], TrackerEntit
     @property
     def available(self) -> bool:
         loc = self.coordinator.get_field(self._field)
-        return loc is not None and isinstance(loc, dict)
+        if isinstance(loc, dict):
+            return True
+        return self._restored_lat is not None and self._restored_lon is not None

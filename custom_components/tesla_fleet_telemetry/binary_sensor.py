@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -147,7 +148,27 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
         return val.strip().strip('"').strip("'").strip()
 
 
-class TeslaDoorStateBinarySensor(CoordinatorEntity[TelemetryCoordinator], BinarySensorEntity):
+class _DoorBinarySensorBase(CoordinatorEntity[TelemetryCoordinator], RestoreEntity, BinarySensorEntity):
+    """Shared restore-on-reload logic for DoorState-derived binary sensors."""
+
+    def __init__(self, coordinator: TelemetryCoordinator) -> None:
+        super().__init__(coordinator)
+        self._restored_is_on: bool | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in (STATE_ON, STATE_OFF):
+            self._restored_is_on = last_state.state == STATE_ON
+
+    @property
+    def available(self) -> bool:
+        if not self.coordinator.last_update_success:
+            return False
+        return self.coordinator.get_field("DoorState") is not None or self._restored_is_on is not None
+
+
+class TeslaDoorStateBinarySensor(_DoorBinarySensorBase):
     """Door/frunk/trunk state derived from DoorState telemetry field."""
 
     _attr_has_entity_name = True
@@ -174,21 +195,15 @@ class TeslaDoorStateBinarySensor(CoordinatorEntity[TelemetryCoordinator], Binary
         return build_device_info(self.coordinator, self._vin)
 
     @property
-    def available(self) -> bool:
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.get_field("DoorState") is not None
-        )
-
-    @property
     def is_on(self) -> bool | None:
-        tokens = door_state_tokens(self.coordinator.get_field("DoorState"))
-        if not tokens and self.coordinator.get_field("DoorState") is None:
-            return None
+        door_state = self.coordinator.get_field("DoorState")
+        if door_state is None:
+            return self._restored_is_on
+        tokens = door_state_tokens(door_state)
         return any(token in tokens for token in self._token_keys)
 
 
-class TeslaAnyDoorOpenBinarySensor(CoordinatorEntity[TelemetryCoordinator], BinarySensorEntity):
+class TeslaAnyDoorOpenBinarySensor(_DoorBinarySensorBase):
     """Binary sensor: whether any door is open."""
 
     _attr_has_entity_name = True
@@ -207,17 +222,11 @@ class TeslaAnyDoorOpenBinarySensor(CoordinatorEntity[TelemetryCoordinator], Bina
         return build_device_info(self.coordinator, self._vin)
 
     @property
-    def available(self) -> bool:
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.get_field("DoorState") is not None
-        )
-
-    @property
     def is_on(self) -> bool | None:
-        tokens = door_state_tokens(self.coordinator.get_field("DoorState"))
-        if not tokens and self.coordinator.get_field("DoorState") is None:
-            return None
+        door_state = self.coordinator.get_field("DoorState")
+        if door_state is None:
+            return self._restored_is_on
+        tokens = door_state_tokens(door_state)
         return bool(tokens)
 
 
