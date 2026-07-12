@@ -7,12 +7,14 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     HomeAssistantError,
     ServiceValidationError,
 )
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import WAKE_UP_RETRY_DELAY_SECONDS
@@ -39,7 +41,7 @@ _VEHICLE_STATE_REJECTIONS = (
 )
 
 
-class CommandEntity(CoordinatorEntity[TelemetryCoordinator]):
+class CommandEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
     """Base for entities that issue vehicle commands through the proxy."""
 
     _attr_has_entity_name = True
@@ -59,6 +61,13 @@ class CommandEntity(CoordinatorEntity[TelemetryCoordinator]):
         self._proxy_client = proxy_client
         self._implementation = implementation
         self._entry = entry
+        self._restored_available = False
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            self._restored_available = True
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -66,14 +75,22 @@ class CommandEntity(CoordinatorEntity[TelemetryCoordinator]):
 
     @property
     def available(self) -> bool:
-        """Available once the coordinator is healthy and backing state exists."""
+        """Available once the coordinator is healthy and backing state exists.
+
+        Falls back to the pre-reload restored state so a config-entry reload
+        (including the routine ones triggered by OAuth token refresh) doesn't
+        flip every command entity to unavailable while waiting for the fresh
+        coordinator to receive its first MQTT message for these fields.
+        """
         if not self.coordinator.last_update_success:
             return False
         if not self._proxy_client.ready:
             return False
         if not self._state_fields:
             return True
-        return any(self.coordinator.get_field(field) is not None for field in self._state_fields)
+        if any(self.coordinator.get_field(field) is not None for field in self._state_fields):
+            return True
+        return self._restored_available
 
     async def _get_token(self) -> str:
         """Return a valid access token, refreshing if needed.
