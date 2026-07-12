@@ -271,7 +271,10 @@ class TeslaSeatLevelSelect(CommandEntity, SelectEntity):
 
         if self._select_def.cooler_field is not None:
             cool_body = {
-                "seat_cooler_level": cool_level,
+                # Wire enum is shifted by one vs. Tesla's docs (Off=1/Low=2/Med=3/
+                # High=4, not 0-3) — confirmed empirically: sending our 0-indexed
+                # level directly turned "Medium" into "Low" and "High" into "Medium".
+                "seat_cooler_level": cool_level + 1,
                 "seat_position": self._select_def.cooler_seat_value,
             }
             await self._send_command("remote_seat_cooler_request", cool_body)
