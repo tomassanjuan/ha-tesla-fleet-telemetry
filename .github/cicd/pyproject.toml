@@ -1,0 +1,142 @@
+[build-system]
+requires = ["setuptools>=65.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ha-tesla-fleet-telemetry"
+version = "1.0.0"
+description = "Tesla Fleet Telemetry integration for Home Assistant"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Tesla Fleet Telemetry Contributors"},
+]
+keywords = [
+    "homeassistant",
+    "tesla",
+    "telemetry",
+    "iot",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Plugins",
+    "Framework :: Home Assistant",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Home Automation",
+]
+
+dependencies = [
+    "paho-mqtt>=2.1.0,<3",
+    "aiohttp>=3.13.4,<4",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry"
+"Documentation" = "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry"
+"Repository" = "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry.git"
+"Issues" = "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry/issues"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "build",
+    "dist",
+    "tests/.fixtures",
+]
+
+[tool.ruff.lint]
+select = [
+    "B",      # flake8-bugbear
+    "C",      # flake8-comprehensions
+    "C90",    # mccabe
+    "E",      # pycodestyle errors
+    "F",      # Pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "S",      # flake8-bandit
+    "UP",     # pyupgrade
+    "W",      # pycodestyle warnings
+]
+ignore = [
+    "B008",   # Do not perform function calls in argument defaults
+    "S101",   # Use of assert detected; assert statements should be replaced with if statements
+    "S104",   # Possible binding to all interfaces
+    "S105",   # Possible hardcoded password
+    "S106",   # Possible hardcoded password
+    "S107",   # Possible hardcoded password
+    "E501",   # Line too long (handled by ruff format)
+    "UP040",  # Use TypeAlias instead of type keyword for better compatibility
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components.tesla_fleet_telemetry"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # Allow assert in tests
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+ignore_missing_imports = true
+follow_imports = "silent"
+strict_optional = true
+no_implicit_optional = true
+warn_redundant_casts = false
+warn_unused_ignores = false
+warn_return_any = false
+warn_unreachable = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = "homeassistant.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "paho.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --strict-markers"
+markers = [
+    "asyncio: marks tests as async (deselect with '-m \"not asyncio\"')",
+]
+
+[tool.coverage.run]
+source = ["custom_components/tesla_fleet_telemetry"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+]

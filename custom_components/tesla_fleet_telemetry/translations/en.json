@@ -1,0 +1,155 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tesla Fleet",
+        "description": "Enter connection endpoints as hostname:port. OAuth credentials are configured through Application Credentials.",
+        "data": {
+          "mqtt_endpoint": "MQTT Broker",
+          "proxy_url": "Tesla HTTP Proxy",
+          "telemetry_mode": "Telemetry Mode"
+        }
+      },
+      "select_vin": {
+        "title": "Select Vehicle",
+        "description": "Choose which Tesla vehicle to use for this integration.",
+        "data": {
+          "vin": "Vehicle VIN"
+        }
+      },
+      "confirm_override": {
+        "title": "Overwrite Vehicle Config",
+        "description": "The vehicle already has a fleet telemetry config for `${existing_hostname}`. Continuing will overwrite it with `${requested_hostname}`."
+      },
+      "auth": {
+        "title": "Link Tesla Account",
+        "description": "Click the link below to authorize access to your Tesla account."
+      },
+      "reauth_confirm": {
+        "title": "Relink Tesla Account",
+        "description": "Your Tesla authorization needs to be refreshed. Continue to relink your Tesla account."
+      },
+      "connection": {
+        "title": "Connection Settings",
+        "description": "Enter connection endpoints as hostname:port. The application domain is the domain registered on developer.tesla.com — required for partner account registration and virtual key pairing.",
+        "data": {
+          "mqtt_endpoint": "MQTT Broker",
+          "mqtt_topic_base": "MQTT Topic Base",
+          "proxy_url": "Tesla HTTP Proxy",
+          "telemetry_server_endpoint": "Telemetry Server",
+          "telemetry_mode": "Telemetry Mode",
+          "domain": "Application Domain"
+        },
+        "data_description": {
+          "domain": "Your app's root domain from developer.tesla.com allowed_origins. Used for partner account registration and the virtual key pairing URL.",
+          "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla)."
+        }
+      }
+    },
+    "error": {
+      "invalid_mqtt_endpoint": "Enter the MQTT broker as host:port.",
+      "mqtt_unreachable": "Could not connect to the MQTT broker. Check the hostname, port, and firewall.",
+      "mqtt_timeout": "Timed out connecting to the MQTT broker. Check that it is reachable from Home Assistant.",
+      "proxy_empty": "Enter the Tesla HTTP proxy hostname or URL.",
+      "proxy_invalid_url": "Enter a valid Tesla HTTP proxy hostname or HTTPS URL.",
+      "proxy_unreachable": "Could not connect to the Tesla HTTP proxy. Check the hostname, port, and firewall.",
+      "proxy_timeout": "Timed out connecting to the Tesla HTTP proxy. Check that it is reachable from Home Assistant.",
+      "invalid_hostname": "Enter a public DNS hostname, not an IP address.",
+      "invalid_port": "Enter a valid port between 1 and 65535.",
+      "invalid_ca": "Could not parse the fetched telemetry server certificate.",
+      "ca_fetch_failed": "Could not connect to the telemetry server to fetch the certificate. Check hostname, port, TLS certificate, and firewall.",
+      "ca_hostname_mismatch": "Certificate fetched but hostname validation failed. The certificate must match the telemetry server hostname.",
+      "token_exchange_failed": "Failed to exchange authorization code for tokens.",
+      "missing_code": "Authorization code was not received.",
+      "invalid_auth": "The new token is not valid. Ensure you are using the correct Tesla account and that the OAuth app has the required scopes, then try again.",
+      "partner_register_failed": "Tesla rejected the domain: {partner_error}"
+    },
+    "abort": {
+      "already_configured": "This vehicle is already configured.",
+      "token_exchange_failed": "Failed to exchange authorization code.",
+      "missing_code": "Authorization callback did not include a code.",
+      "reauth_not_possible": "Unable to start reauthentication for this entry.",
+      "already_in_progress": "Tesla authorization is already in progress. Finish the open authorization window or restart Home Assistant to clear the abandoned flow.",
+      "vin_fetch_failed": "Unable to fetch vehicles from Tesla Fleet API.",
+      "no_vehicles": "No vehicles were returned for this Tesla account."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Enter connection endpoints as hostname:port. Changing the application domain will trigger re-registration with Tesla.",
+        "data": {
+          "mqtt_endpoint": "MQTT Broker",
+          "mqtt_topic_base": "MQTT Topic Base",
+          "proxy_url": "Tesla HTTP Proxy",
+          "telemetry_server_endpoint": "Telemetry Server",
+          "telemetry_mode": "Telemetry Mode",
+          "domain": "Application Domain"
+        },
+        "data_description": {
+          "domain": "Your app's root domain from developer.tesla.com (e.g. yourdomain.com). Used for partner account registration and virtual key pairing.",
+          "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla)."
+        }
+      }
+    },
+    "error": {
+      "invalid_mqtt_endpoint": "Enter the MQTT broker as host:port.",
+      "mqtt_unreachable": "Could not connect to the MQTT broker. Check the hostname, port, and firewall.",
+      "mqtt_timeout": "Timed out connecting to the MQTT broker. Check that it is reachable from Home Assistant.",
+      "proxy_empty": "Enter the Tesla HTTP proxy hostname or URL.",
+      "proxy_invalid_url": "Enter a valid Tesla HTTP proxy hostname or HTTPS URL.",
+      "proxy_unreachable": "Could not connect to the Tesla HTTP proxy. Check the hostname, port, and firewall.",
+      "proxy_timeout": "Timed out connecting to the Tesla HTTP proxy. Check that it is reachable from Home Assistant.",
+      "invalid_hostname": "Enter a public DNS hostname, not an IP address.",
+      "invalid_port": "Enter a valid port between 1 and 65535.",
+      "invalid_ca": "Could not parse the fetched telemetry server certificate.",
+      "telemetry_server_rejected": "Tesla rejected the telemetry server settings. Review the values and try again.",
+      "ca_fetch_failed": "Could not connect to the telemetry server to fetch the certificate. Check hostname, port, TLS certificate, and firewall.",
+      "ca_hostname_mismatch": "Certificate fetched but hostname validation failed. The certificate must match the telemetry server hostname.",
+      "partner_register_failed": "Tesla rejected the domain: {partner_error}"
+    }
+  },
+  "issues": {
+    "key_not_paired": {
+      "title": "Tesla Virtual Key Not Paired — {vin}",
+      "description": "Vehicle **{vin}** reports the virtual key is not paired. Vehicle commands will be rejected until the key is paired.\n\nOpen the Tesla app and scan the QR code or tap **Learn more** to pair the key. Then click the **Fix** button to verify the pairing and sync the configuration.\n\n[![QR Code — tap to open pairing link]({qr_url})]({pairing_url})",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Verify Virtual Key Pairing",
+            "description": "Pair the virtual key for **{vin}** using the Tesla app, then click **Submit** to verify.\n\nScan the QR code below or [open the pairing link]({pairing_url}):\n\n[![QR Code]({qr_url})]({pairing_url})"
+          }
+        },
+        "abort": {
+          "entry_not_found": {
+            "title": "Integration Entry Not Found",
+            "description": "Could not find the Tesla Fleet Telemetry integration entry for this vehicle."
+          },
+          "still_not_paired": {
+            "title": "Virtual Key Not Yet Paired",
+            "description": "The virtual key for **{vin}** is still not paired. Open the Tesla app and pair the key, then click Fix again."
+          },
+          "repair_failed": {
+            "title": "Repair Check Failed",
+            "description": "Failed to check the virtual key pairing status. Ensure your telemetry server is reachable and try again."
+          }
+        }
+      }
+    },
+    "unknown_telemetry_field": {
+      "title": "Unknown Telemetry Field — {vin}",
+      "description": "Vehicle **{vin}** reported an unknown telemetry field: `{field}`\n\nThis field is likely not supported by your vehicle or the Tesla Fleet Telemetry API. The field is not being streamed, but disable the related entity to clear this issue.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Disable Unknown Field Entity",
+            "description": "The telemetry field `{field}` for vehicle **{vin}** is not recognized by Tesla. Click **Submit** to acknowledge and disable the related entity.\n\nYou can manually re-enable it in Settings → Devices & Services if needed."
+          }
+        }
+      }
+    }
+  },
+  "application_credentials": {
+    "description": "Create Tesla OAuth credentials in the [Tesla developer console]({console_url}), then add them in Home Assistant Application Credentials."
+  }
+}

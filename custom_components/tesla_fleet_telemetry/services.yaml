@@ -1,0 +1,26 @@
+schedule_software_update:
+  name: Schedule Software Update
+  description: Schedule the vehicle's pending software update for installation
+  target:
+    entity:
+      domain: update
+      integration: tesla_fleet_telemetry
+  fields:
+    offset_sec:
+      name: Offset Seconds
+      description: Seconds from now to schedule the installation (default 300 = 5 minutes)
+      default: 300
+      example: 300
+      selector:
+        number:
+          min: 0
+          max: 86400
+          unit_of_measurement: s
+
+cancel_software_update:
+  name: Cancel Software Update
+  description: Cancel the scheduled software update installation
+  target:
+    entity:
+      domain: update
+      integration: tesla_fleet_telemetry

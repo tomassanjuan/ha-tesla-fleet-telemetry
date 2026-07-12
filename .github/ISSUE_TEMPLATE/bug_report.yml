@@ -1,0 +1,100 @@
+name: Bug Report
+description: Report a problem with the Tesla Fleet Telemetry integration
+title: "[BUG] "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please provide as much detail as possible to help us fix it.
+
+  - type: textarea
+    id: describe_bug
+    attributes:
+      label: Describe the bug
+      description: A clear description of what the bug is
+      placeholder: "Example: When I set the charge limit to 80%, it reverts to the previous value..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to...
+        2. Click on...
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen
+      placeholder: "Example: The charge limit should be set and stay at 80%"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual behavior
+      description: What actually happened
+      placeholder: "Example: The charge limit reverts after 10 seconds"
+    validations:
+      required: false
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Version shown in Settings → System → About
+      placeholder: "e.g., 2024.1.1"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: Version shown in Settings → Devices & Services → Tesla Fleet Telemetry
+      placeholder: "e.g., 1.0.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Paste logs from Home Assistant (Settings → System → Logs) or Docker container logs.
+        Use `docker compose logs tesla_http_proxy` or `docker compose logs fleet_telemetry`.
+      placeholder: "Paste logs here..."
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Any other context that might help
+      placeholder: "Example: This happens only when the vehicle is actively charging"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked existing issues and found no duplicates
+          required: true
+        - label: I have provided logs or error messages
+          required: false
+        - label: I have verified the telemetry server and proxy are running
+          required: false

@@ -1,0 +1,27 @@
+name: Weekly Security Scan
+
+"on":
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly Sunday at midnight UTC
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up CI Python
+        uses: ./.github/actions/setup-ci-python
+        with:
+          python-version: '3.13.2'
+          extra-packages: 'pip-audit bandit'
+
+      - name: Run pip-audit
+        run: pip-audit -r .github/cicd/requirements-security.txt --desc
+
+      - name: Run bandit
+        run: bandit -r custom_components -q
