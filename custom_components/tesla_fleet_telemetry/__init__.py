@@ -575,15 +575,24 @@ async def _async_run_setup_bootstrap(
         _LOGGER.debug("Starting background setup bootstrap for %s", vin)
 
         push_result = await push_entry_telemetry_config(reason="setup")
+        # Entity registry entries can still be settling when this first push fires,
+        # so it can race ahead of them and resolve only the always-on metadata
+        # fields. Retry once so it picks up the real enabled-entity field set.
+        fields_are_fallback_only = push_result.get("pushed") and push_result.get(
+            "field_count"
+        ) <= len(DEVICE_METADATA_FIELDS)
         # Retry push once if it failed (likely proxy went down after initial check)
-        if (
-            not push_result.get("pushed")
-            and not push_result.get("skipped")
-            and not push_result.get("rate_limited")
+        # or only resolved the fallback metadata fields (entity registry race).
+        if not push_result.get("rate_limited") and (
+            (not push_result.get("pushed") and not push_result.get("skipped"))
+            or fields_are_fallback_only
         ):
             _LOGGER.warning(
-                "fleet_telemetry_config push failed during bootstrap for %s — retrying in %ss",
+                "fleet_telemetry_config push during bootstrap for %s %s — retrying in %ss",
                 vin,
+                "failed"
+                if not push_result.get("pushed")
+                else "only resolved fallback metadata fields",
                 BOOTSTRAP_PUSH_RETRY_DELAY_SECONDS,
             )
             await asyncio.sleep(BOOTSTRAP_PUSH_RETRY_DELAY_SECONDS)
