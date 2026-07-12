@@ -68,9 +68,7 @@ from .oauth2 import (
 from .proxy_client import TeslaProxyClient
 
 _LOGGER = logging.getLogger(__name__)
-ASYNC_DISPATCHER_SEND = cast(
-    Callable[[HomeAssistant, str, Any], None], async_dispatcher_send
-)
+ASYNC_DISPATCHER_SEND = cast(Callable[[HomeAssistant, str, Any], None], async_dispatcher_send)
 
 
 @dataclass
@@ -140,7 +138,9 @@ def _sync_key_pairing_issue(
         _notify_key_not_paired(
             hass,
             vin,
-            str(entry.data.get(CONF_DOMAIN) or entry.data.get(CONF_TELEMETRY_SERVER_HOSTNAME) or ""),
+            str(
+                entry.data.get(CONF_DOMAIN) or entry.data.get(CONF_TELEMETRY_SERVER_HOSTNAME) or ""
+            ),
         )
     elif result.get("key_paired") is True:
         _dismiss_key_not_paired(hass, vin)

@@ -51,9 +51,9 @@ def test_fields_for_unique_id_covers_every_entity_field_mapping() -> None:
     """Every declared multi-field/aliased mapping must resolve via its own VIN."""
     for suffix, mapping in ENTITY_FIELD_MAPPINGS.items():
         unique_id = telemetry_unique_id(TEST_VIN, suffix)
-        assert _fields_for_unique_id(unique_id, TEST_VIN) == set(mapping.fields), (
-            f"suffix {suffix!r} did not round-trip to its mapped fields"
-        )
+        assert _fields_for_unique_id(unique_id, TEST_VIN) == set(
+            mapping.fields
+        ), f"suffix {suffix!r} did not round-trip to its mapped fields"
 
 
 def test_destination_and_origin_location_are_mapped() -> None:

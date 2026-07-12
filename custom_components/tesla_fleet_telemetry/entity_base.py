@@ -68,7 +68,6 @@ class TelemetryEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
     @property
     def available(self) -> bool:
         """Available when a live or restored value exists."""
-        return (
-            self.coordinator.last_update_success
-            and (self.raw_value is not None or self._restored_state is not None)
+        return self.coordinator.last_update_success and (
+            self.raw_value is not None or self._restored_state is not None
         )
