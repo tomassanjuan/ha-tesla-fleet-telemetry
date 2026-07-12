@@ -44,6 +44,7 @@ _JSON_PASSTHROUGH_ENDPOINTS = [
     ("remote_auto_seat_climate_request", {"auto_seat_position": 1, "auto_climate_on": True}),
     ("remote_steering_wheel_heater_request", {"on": True}),
     ("remote_steering_wheel_heat_level_request", {"level": 1}),
+    ("remote_auto_steering_wheel_heat_climate_request", {"on": True}),
 ]
 
 

@@ -127,3 +127,26 @@ async def test_cool_medium_sends_seat_cooler_level_three(
     entity._send_command.assert_any_call(
         "remote_seat_cooler_request", {"seat_cooler_level": 3, "seat_position": 1}
     )
+
+
+async def test_wheel_heater_auto_uses_auto_climate_endpoint(
+    coordinator: TelemetryCoordinator, config_entry: ConfigEntry
+) -> None:
+    """remote_steering_wheel_heater_request is documented as the on/off command
+    for vehicles that do NOT support auto steering wheel heat; sending it for
+    "Auto" on a vehicle that does support it fails with InvalidCommand. The
+    auto toggle must go through remote_auto_steering_wheel_heat_climate_request.
+    """
+    from unittest.mock import AsyncMock
+
+    from custom_components.tesla_fleet_telemetry.select import SEAT_SELECT_DEFS, TeslaSeatLevelSelect
+
+    select_def = next(d for d in SEAT_SELECT_DEFS if d.key == "wheel_heater")
+    entity = TeslaSeatLevelSelect(*_command_entity_args(coordinator, config_entry), select_def)
+    entity._send_command = AsyncMock()
+
+    await entity.async_select_option("Auto")
+
+    entity._send_command.assert_called_once_with(
+        "remote_auto_steering_wheel_heat_climate_request", {"on": True}
+    )

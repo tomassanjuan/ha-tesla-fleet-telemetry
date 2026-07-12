@@ -127,7 +127,7 @@ SEAT_SELECT_DEFS: tuple[SeatSelectDef, ...] = (
         endpoint="remote_steering_wheel_heat_level_request",
         level_key="level",
         enabled_default=True,
-        auto_endpoint="remote_steering_wheel_heater_request",
+        auto_endpoint="remote_auto_steering_wheel_heat_climate_request",
         auto_field="HvacSteeringWheelHeatAuto",
         use_wheel_levels=True,
     ),
@@ -225,13 +225,13 @@ class TeslaSeatLevelSelect(CommandEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         if option == "Auto" and self._select_def.auto_endpoint:
-            if self._select_def.auto_endpoint == "remote_steering_wheel_heater_request":
-                body_auto: dict[str, Any] = {"on": True}
-            else:
-                body_auto = {
+            if self._select_def.auto_seat_position is not None:
+                body_auto: dict[str, Any] = {
                     "auto_seat_position": self._select_def.auto_seat_position,
                     "auto_climate_on": True,
                 }
+            else:
+                body_auto = {"on": True}
             await self._send_command(self._select_def.auto_endpoint, body_auto)
             if self._select_def.auto_field:
                 self.coordinator.async_update_field(self._select_def.auto_field, True)
