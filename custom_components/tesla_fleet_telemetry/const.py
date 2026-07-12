@@ -401,6 +401,8 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:map-marker-distance",
         entity_registry_enabled_default=True,
         minimum_delta_override=0.1,
+        min_valid=0,
+        max_valid=600.0,
     ),
     TelemetryEntityDescription(
         key="ScheduledChargingMode",
@@ -789,6 +791,8 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:map-marker-distance",
         entity_registry_enabled_default=True,
+        min_valid=0,
+        max_valid=600.0,
     ),
     TelemetryEntityDescription(
         key="EfficiencyPackage",
@@ -873,6 +877,8 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:map-marker-distance",
         entity_registry_enabled_default=True,
+        min_valid=0,
+        max_valid=600.0,
     ),
     TelemetryEntityDescription(
         key="LifetimeEnergyUsed",
@@ -895,6 +901,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:counter",
         entity_category=EntityCategory.DIAGNOSTIC,
+        min_valid=0,
     ),
     TelemetryEntityDescription(
         key="SelfDrivingMilesSinceReset",
@@ -906,6 +913,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:robot",
         entity_category=EntityCategory.DIAGNOSTIC,
+        min_valid=0,
     ),
     TelemetryEntityDescription(
         key="LightsTurnSignal",
@@ -924,6 +932,8 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:map-marker-distance",
         entity_registry_enabled_default=True,
+        min_valid=0,
+        max_valid=1000.0,
     ),
     TelemetryEntityDescription(
         key="MinutesToArrival",
@@ -1193,6 +1203,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:counter",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=True,
+        min_valid=0,
     ),
     TelemetryEntityDescription(
         key="ScheduledChargingStartTime",
