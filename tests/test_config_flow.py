@@ -39,9 +39,7 @@ from .conftest import TEST_VIN
         ("192.168.1.10:8883", "192.168.1.10", 8883),
     ],
 )
-def test_parse_mqtt_endpoint_success(
-    endpoint: str, expected_host: str, expected_port: int
-) -> None:
+def test_parse_mqtt_endpoint_success(endpoint: str, expected_host: str, expected_port: int) -> None:
     host, port = _parse_mqtt_endpoint(endpoint)
     assert (host, port) == (expected_host, expected_port)
 

@@ -138,7 +138,11 @@ class TeslaConfigActionButton(ButtonEntity):
 
     async def async_press(self) -> None:
         try:
-            if self._defn.key in ("push_telemetry_config", "delete_telemetry_config", "get_telemetry_config"):
+            if self._defn.key in (
+                "push_telemetry_config",
+                "delete_telemetry_config",
+                "get_telemetry_config",
+            ):
                 _LOGGER.info("%s button pressed for %s", self._defn.key, self._vin)
             result = await self._action()
             if self._defn.key == "get_telemetry_config":

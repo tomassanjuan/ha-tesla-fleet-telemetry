@@ -23,6 +23,7 @@ from .polling_profiles import INSTANT_FIELDS, POLLING_PROFILES, field_group_for_
 # Type aliases for telemetry policies
 FieldPolicy: TypeAlias = dict[str, int | float]
 
+
 @dataclass(frozen=True)
 class TelemetryPolicyContext:
     """Inputs required to resolve fleet telemetry field policy."""

@@ -10,8 +10,8 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -57,9 +57,7 @@ async def async_setup_entry(
         for description in DESCRIPTIONS
         if description.binary and not description.has_dedicated_entity
     ]
-    entities.extend(
-        TeslaDoorStateBinarySensor(coordinator, vin, *args) for args in _DOOR_SENSORS
-    )
+    entities.extend(TeslaDoorStateBinarySensor(coordinator, vin, *args) for args in _DOOR_SENSORS)
     entities.extend(
         [
             TeslaAnyDoorOpenBinarySensor(coordinator, vin),

@@ -10,8 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 
 from .const import (
@@ -504,12 +503,9 @@ def _process_and_log_telemetry_errors(
     parts = [f"error_name={error_name}"]
     if description:
         parts.append(f"description={description}")
-    if first_seen and last_seen and first_seen != last_seen:
-        parts.append(f"count={len(errors)}")
-        if age_label:
-            parts.append(f"last_seen_age={age_label.strip(' ()')}")
-    elif last_seen:
-        parts.append("count=1")
+    if last_seen:
+        repeated = bool(first_seen) and first_seen != last_seen
+        parts.append(f"count={len(errors) if repeated else 1}")
         if age_label:
             parts.append(f"last_seen_age={age_label.strip(' ()')}")
     if target:

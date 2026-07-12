@@ -64,9 +64,7 @@ def test_device_tracker_entity(coordinator: TelemetryCoordinator) -> None:
     _assert_common(entity, "location")
 
 
-def _command_entity_args(
-    coordinator: TelemetryCoordinator, config_entry: ConfigEntry
-) -> tuple:
+def _command_entity_args(coordinator: TelemetryCoordinator, config_entry: ConfigEntry) -> tuple:
     proxy_client = MagicMock()
     proxy_client.ready = True
     implementation = MagicMock()

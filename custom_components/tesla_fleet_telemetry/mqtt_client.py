@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 import json
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 import paho.mqtt.client as mqtt

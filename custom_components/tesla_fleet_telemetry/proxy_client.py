@@ -188,11 +188,7 @@ class TeslaProxyClient:
     @property
     def ready(self) -> bool:
         """Return whether the proxy client can currently accept commands."""
-        return (
-            not self._is_session_closed()
-            and self._api is not None
-            and self._vehicle is not None
-        )
+        return not self._is_session_closed() and self._api is not None and self._vehicle is not None
 
     async def async_check_api_capabilities(self, access_token: str = "") -> bool:
         """Check if proxy supports required endpoints via a health check (issue #40).

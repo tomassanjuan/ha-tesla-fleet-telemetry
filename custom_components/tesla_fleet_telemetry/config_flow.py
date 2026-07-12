@@ -565,10 +565,9 @@ def _telemetry_endpoint_changed(current: dict[str, Any], user_input: dict[str, A
         )
     except ValueError:
         return False
-    return (
-        hostname.strip().rstrip(".") != current.get(CONF_TELEMETRY_SERVER_HOSTNAME)
-        or port != current.get(CONF_TELEMETRY_SERVER_PORT)
-    )
+    return hostname.strip().rstrip(".") != current.get(
+        CONF_TELEMETRY_SERVER_HOSTNAME
+    ) or port != current.get(CONF_TELEMETRY_SERVER_PORT)
 
 
 class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
@@ -1102,9 +1101,10 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlow):
             submitted_input = dict(user_input)
             # Validate connection settings.
             if await self._validate_options_input(user_input, errors):
-                if _telemetry_endpoint_changed(merged, user_input) or not str(
-                    merged.get(CONF_TELEMETRY_SERVER_CA, "") or ""
-                ).strip():
+                if (
+                    _telemetry_endpoint_changed(merged, user_input)
+                    or not str(merged.get(CONF_TELEMETRY_SERVER_CA, "") or "").strip()
+                ):
                     user_input = await _maybe_autofetch_ca(self.hass, user_input, errors)
                 else:
                     user_input[CONF_TELEMETRY_SERVER_CA] = merged.get(
