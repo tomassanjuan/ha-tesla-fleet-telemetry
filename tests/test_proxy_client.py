@@ -49,9 +49,7 @@ _JSON_PASSTHROUGH_ENDPOINTS = [
 
 
 @pytest.mark.parametrize(("endpoint", "body"), _JSON_PASSTHROUGH_ENDPOINTS)
-async def test_seat_and_wheel_commands_use_json_passthrough(
-    endpoint: str, body: dict
-) -> None:
+async def test_seat_and_wheel_commands_use_json_passthrough(endpoint: str, body: dict) -> None:
     """The signed Vehicle Command Protocol wrapper methods (tesla-fleet-api's
     `v.remote_seat_heater_request()` etc.) were rejected by some vehicles with
     InvalidRequest/InvalidCommand. These endpoints must instead be posted as

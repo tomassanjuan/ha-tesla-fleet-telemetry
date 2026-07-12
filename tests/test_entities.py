@@ -116,7 +116,10 @@ async def test_cool_medium_sends_seat_cooler_level_three(
     """
     from unittest.mock import AsyncMock
 
-    from custom_components.tesla_fleet_telemetry.select import SEAT_SELECT_DEFS, TeslaSeatLevelSelect
+    from custom_components.tesla_fleet_telemetry.select import (
+        SEAT_SELECT_DEFS,
+        TeslaSeatLevelSelect,
+    )
 
     select_def = next(d for d in SEAT_SELECT_DEFS if d.key == "seat_heater_front_left")
     entity = TeslaSeatLevelSelect(*_command_entity_args(coordinator, config_entry), select_def)
@@ -139,7 +142,10 @@ async def test_wheel_heater_auto_uses_auto_climate_endpoint(
     """
     from unittest.mock import AsyncMock
 
-    from custom_components.tesla_fleet_telemetry.select import SEAT_SELECT_DEFS, TeslaSeatLevelSelect
+    from custom_components.tesla_fleet_telemetry.select import (
+        SEAT_SELECT_DEFS,
+        TeslaSeatLevelSelect,
+    )
 
     select_def = next(d for d in SEAT_SELECT_DEFS if d.key == "wheel_heater")
     entity = TeslaSeatLevelSelect(*_command_entity_args(coordinator, config_entry), select_def)
@@ -162,7 +168,10 @@ async def test_wheel_heater_high_sends_documented_wire_level_three(
     """
     from unittest.mock import AsyncMock
 
-    from custom_components.tesla_fleet_telemetry.select import SEAT_SELECT_DEFS, TeslaSeatLevelSelect
+    from custom_components.tesla_fleet_telemetry.select import (
+        SEAT_SELECT_DEFS,
+        TeslaSeatLevelSelect,
+    )
 
     select_def = next(d for d in SEAT_SELECT_DEFS if d.key == "wheel_heater")
     entity = TeslaSeatLevelSelect(*_command_entity_args(coordinator, config_entry), select_def)
