@@ -89,3 +89,17 @@ def test_switch_entity(coordinator: TelemetryCoordinator, config_entry: ConfigEn
 def test_number_entity(coordinator: TelemetryCoordinator, config_entry: ConfigEntry) -> None:
     entity = ChargeLimitNumber(*_command_entity_args(coordinator, config_entry))
     _assert_common(entity, "charge_limit")
+
+
+def test_seat_select_defs_use_zero_based_seat_indices() -> None:
+    """tesla-fleet-api indexes front-left/front-right as 0/1 into its position
+    tuple, not the raw Tesla protobuf enum values (1/2) — mixing these up
+    causes an IndexError (front-right) or a wrong-seat command (front-left).
+    """
+    from custom_components.tesla_fleet_telemetry.select import SEAT_SELECT_DEFS
+
+    by_key = {d.key: d for d in SEAT_SELECT_DEFS}
+    assert by_key["seat_heater_front_left"].cooler_seat_value == 0
+    assert by_key["seat_heater_front_right"].cooler_seat_value == 1
+    assert by_key["seat_heater_front_left"].auto_seat_position == 0
+    assert by_key["seat_heater_front_right"].auto_seat_position == 1
