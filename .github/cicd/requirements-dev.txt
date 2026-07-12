@@ -6,7 +6,18 @@ paho-mqtt>=2.1.0,<3
 tesla-fleet-api==1.4.7
 
 # Home Assistant (for type hints)
-homeassistant>=2026.0.0
+homeassistant>=2026.6.0
+
+# Transitive deps pulled in by homeassistant / pytest-homeassistant-custom-component,
+# pinned to patched versions to satisfy the weekly pip-audit CVE scan.
+aiohttp>=3.14.1
+cryptography>=46.0.7
+pillow>=12.2.0
+pyjwt>=2.13.0
+pyopenssl>=26.0.0
+requests>=2.33.0
+zeroconf>=0.149.16
+orjson>=3.11.6
 
 # Linting & formatting
 ruff>=0.3.0
@@ -16,7 +27,7 @@ mypy==1.9.0
 types-PyYAML
 
 # Testing
-pytest>=7.4.0
+pytest>=9.0.3
 pytest-asyncio>=0.23.0
 pytest-cov>=4.1.0
 pytest-timeout>=2.1.0
