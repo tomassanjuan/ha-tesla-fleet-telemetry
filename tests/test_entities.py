@@ -104,3 +104,26 @@ def test_seat_select_defs_use_documented_wire_seat_indices() -> None:
     assert by_key["seat_heater_front_right"].cooler_seat_value == 2
     assert by_key["seat_heater_front_left"].auto_seat_position == 1
     assert by_key["seat_heater_front_right"].auto_seat_position == 2
+
+
+async def test_cool_medium_sends_seat_cooler_level_three(
+    coordinator: TelemetryCoordinator, config_entry: ConfigEntry
+) -> None:
+    """Tesla's seat_cooler_level wire enum is shifted by one vs. its own docs
+    (Off=1/Low=2/Med=3/High=4, not 0-3) — confirmed empirically: sending the
+    0-indexed level directly turned "Medium" into "Low" and "High" into
+    "Medium" on the vehicle.
+    """
+    from unittest.mock import AsyncMock
+
+    from custom_components.tesla_fleet_telemetry.select import SEAT_SELECT_DEFS, TeslaSeatLevelSelect
+
+    select_def = next(d for d in SEAT_SELECT_DEFS if d.key == "seat_heater_front_left")
+    entity = TeslaSeatLevelSelect(*_command_entity_args(coordinator, config_entry), select_def)
+    entity._send_command = AsyncMock()
+
+    await entity.async_select_option("Cool Medium")
+
+    entity._send_command.assert_any_call(
+        "remote_seat_cooler_request", {"seat_cooler_level": 3, "seat_position": 1}
+    )
