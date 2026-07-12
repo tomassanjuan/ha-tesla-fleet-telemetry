@@ -65,9 +65,9 @@ SEAT_SELECT_DEFS: tuple[SeatSelectDef, ...] = (
         seat_value=0,
         enabled_default=True,
         cooler_field="ClimateSeatCoolingFrontLeft",
-        cooler_seat_value=1,
+        cooler_seat_value=0,
         auto_endpoint="remote_auto_seat_climate_request",
-        auto_seat_position=1,
+        auto_seat_position=0,
         auto_field="AutoSeatClimateLeft",
     ),
     SeatSelectDef(
@@ -81,9 +81,9 @@ SEAT_SELECT_DEFS: tuple[SeatSelectDef, ...] = (
         seat_value=1,
         enabled_default=True,
         cooler_field="ClimateSeatCoolingFrontRight",
-        cooler_seat_value=2,
+        cooler_seat_value=1,
         auto_endpoint="remote_auto_seat_climate_request",
-        auto_seat_position=2,
+        auto_seat_position=1,
         auto_field="AutoSeatClimateRight",
     ),
     SeatSelectDef(
