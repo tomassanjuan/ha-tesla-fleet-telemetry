@@ -69,12 +69,12 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_update_success = True
         self.async_update_listeners()
 
-    @callback
-    def async_shutdown(self) -> None:
+    async def async_shutdown(self) -> None:
         """Cancel delayed listener updates during entry unload."""
         if self._notify_handle is not None:
             self._notify_handle.cancel()
             self._notify_handle = None
+        await super().async_shutdown()
 
     @callback
     def _notify_field_listeners(self, field: str, value: Any) -> None:

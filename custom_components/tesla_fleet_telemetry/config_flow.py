@@ -136,7 +136,7 @@ async def _async_verify_connection_endpoints(
         return_exceptions=True,
     )
     errors: dict[str, str] = {}
-    if isinstance(mqtt_result, Exception):
+    if isinstance(mqtt_result, BaseException):
         _LOGGER.debug("MQTT verification error: %s", mqtt_result)
         errors[CONF_MQTT_ENDPOINT] = "mqtt_unreachable"
     else:
@@ -144,7 +144,7 @@ async def _async_verify_connection_endpoints(
         if not mqtt_ok:
             errors[CONF_MQTT_ENDPOINT] = mqtt_err or "mqtt_unreachable"
 
-    if isinstance(proxy_result, Exception):
+    if isinstance(proxy_result, BaseException):
         _LOGGER.debug("Proxy verification error: %s", proxy_result)
         errors[CONF_PROXY_URL] = "proxy_unreachable"
     else:
