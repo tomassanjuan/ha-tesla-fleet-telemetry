@@ -1,17 +1,17 @@
 {
   "domain": "tesla_fleet_telemetry",
   "name": "Tesla Fleet Telemetry",
-  "version": "1.0.0",
+  "codeowners": ["@tomassanjuan"],
   "config_flow": true,
+  "dependencies": ["application_credentials", "auth"],
   "documentation": "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry",
+  "integration_type": "hub",
+  "iot_class": "local_push",
   "issue_tracker": "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry/issues",
   "requirements": [
     "paho-mqtt==2.1.0",
     "qrcode[png]>=8.2",
     "tesla-fleet-api==1.4.7"
   ],
-  "dependencies": ["application_credentials", "auth"],
-  "codeowners": ["@tomassanjuan"],
-  "integration_type": "hub",
-  "iot_class": "local_push"
+  "version": "1.0.0"
 }
