@@ -1,0 +1,44 @@
+name: CI
+
+"on":
+  push:
+    branches: [main, develop]
+    paths:
+      - "custom_components/tesla_fleet_telemetry/**"
+      - "tests/**"
+      - ".github/cicd/**"
+      - ".github/actions/**"
+      - ".github/workflows/**"
+      - ".github/.yamllint.yml"
+      - ".github/.pre-commit-config.yaml"
+      - "hacs.json"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "custom_components/tesla_fleet_telemetry/**"
+      - "tests/**"
+      - ".github/cicd/**"
+      - ".github/actions/**"
+      - ".github/workflows/**"
+      - ".github/.yamllint.yml"
+      - ".github/.pre-commit-config.yaml"
+      - "hacs.json"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run CI pipeline
+        uses: ./.github/actions/run-ci-pipeline
+        with:
+          python-version: "3.13.2"

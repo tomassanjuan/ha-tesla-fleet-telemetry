@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Tesla Developer Documentation
+    url: https://developer.tesla.com/docs
+    about: Official Tesla Fleet API documentation
+
+  - name: Home Assistant Community
+    url: https://community.home-assistant.io
+    about: Get help from the Home Assistant community
+
+  - name: Discord Community (if applicable)
+    url: https://discord.gg/your-discord
+    about: Real-time chat and support
