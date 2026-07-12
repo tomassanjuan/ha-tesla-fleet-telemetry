@@ -11,8 +11,8 @@ homeassistant>=2026.0.0
 # Transitive deps pulled in by homeassistant / pytest-homeassistant-custom-component,
 # pinned to patched versions to satisfy the weekly pip-audit CVE scan.
 aiohttp>=3.13.3
-cryptography>=46.0.5
-pillow>=12.2.0
+cryptography>=46.0.2
+pillow>=12.0.0
 pyjwt>=2.10.1
 pyopenssl>=26.0.0
 requests>=2.33.0
