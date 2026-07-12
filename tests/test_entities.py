@@ -154,12 +154,13 @@ async def test_wheel_heater_auto_uses_auto_climate_endpoint(
     )
 
 
-async def test_wheel_heater_low_sends_wire_level_two(
+async def test_wheel_heater_high_sends_documented_wire_level_three(
     coordinator: TelemetryCoordinator, config_entry: ConfigEntry
 ) -> None:
-    """StwHeatLevels in tesla-fleet-api resolves to (1, 2, 3), not (0, 1, 2) —
-    the steering wheel heat level wire enum starts at 1, same off-by-one
-    class of bug as the seat cooler level.
+    """Tesla's own docs for remote_steering_wheel_heat_level_request specify
+    level 0=off/1=low/3=high (medium/2 is not exposed) — this is the plain
+    JSON body we send via the proxy passthrough, so it must match the docs
+    exactly, unlike the seat_cooler_level endpoint which is shifted vs. its docs.
     """
     from unittest.mock import AsyncMock
 
@@ -169,8 +170,8 @@ async def test_wheel_heater_low_sends_wire_level_two(
     entity = TeslaSeatLevelSelect(*_command_entity_args(coordinator, config_entry), select_def)
     entity._send_command = AsyncMock()
 
-    await entity.async_select_option("Low")
+    await entity.async_select_option("High")
 
     entity._send_command.assert_called_once_with(
-        "remote_steering_wheel_heat_level_request", {"level": 2}
+        "remote_steering_wheel_heat_level_request", {"level": 3}
     )
