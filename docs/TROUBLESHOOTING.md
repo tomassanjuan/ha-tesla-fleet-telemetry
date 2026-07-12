@@ -72,6 +72,36 @@ Steps:
 5. Reload the integration.
 6. Wake the vehicle only if you need immediate validation.
 
+## Only Metadata Fields Arriving (CarType, EfficiencyPackage, VehicleName, Version)
+
+If MQTT only ever delivers these four fields, the vehicle is streaming exactly
+what was pushed to it — these are the integration's always-on baseline
+(`DEVICE_METADATA_FIELDS` in `const.py`), sent even when no entity-driven
+fields resolved. Seeing only these means `fleet_telemetry_config` was pushed
+before the entity registry finished settling after startup, so field
+resolution found 0 enabled entities and fell back to the baseline.
+
+This can happen on the very first push after a Home Assistant restart
+(`reason=setup` in the logs). Check `home-assistant.log` for:
+
+```
+Resolved 0 entity-driven telemetry fields for <VIN>
+...total=4 fast=0 slow=4
+```
+
+The integration retries this push automatically if it detects a fallback-only
+result, so it should self-correct within a few seconds without any action.
+If it doesn't, force a fresh push from the vehicle's device page
+(`push_telemetry_config` button) or reload the integration.
+
+**Don't consider this resolved just because the push call logged
+successfully or the vehicle acknowledged it** (`{'response':
+{'updated_vehicles': 1}}`) — that only confirms the push was accepted, not
+that it contained the fields you expect. Always confirm by watching live
+MQTT traffic (`mosquitto_sub -h mqtt.local -t 'tesla/<VIN>/#' -v`) for the
+fields tied to your enabled entities (battery level, location, charge state,
+etc.), not just the four metadata fields above.
+
 ## Commands Fail
 
 Likely causes:
