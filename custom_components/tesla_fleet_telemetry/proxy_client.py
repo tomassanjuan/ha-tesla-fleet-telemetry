@@ -418,7 +418,6 @@ class TeslaProxyClient:
                     await v.navigation_gps_request(lat, lon, body.get("order")),
                 )
             case "remote_boombox":
-                # HA sends sound_id; package expects sound — accept either key.
                 sound = body.get("sound", body.get("sound_id", 0))
                 return cast(dict[str, Any], await v.remote_boombox(sound))
             case (

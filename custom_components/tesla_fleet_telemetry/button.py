@@ -37,8 +37,8 @@ BUTTON_DEFS: list[ButtonDef] = [
     ButtonDef("honk", "Honk", "mdi:bullhorn", "honk_horn"),
     ButtonDef("flash", "Flash", "mdi:car-light-high", "flash_lights"),
     ButtonDef("wake", "Wake Vehicle", "mdi:sleep-off", "wake_up"),
-    ButtonDef("boombox", "Fart", "mdi:smoke", "remote_boombox", {"sound_id": 0}),
-    ButtonDef("locate", "Locate", "mdi:map-marker", "remote_boombox", {"sound_id": 2000}),
+    ButtonDef("boombox", "Fart", "mdi:smoke", "remote_boombox", {"sound": 0}),
+    ButtonDef("locate", "Locate", "mdi:map-marker", "remote_boombox", {"sound": 2000}),
 ]
 
 
