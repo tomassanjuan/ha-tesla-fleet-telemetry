@@ -27,7 +27,7 @@ jobs:
       - name: Set up CI Python
         uses: ./.github/actions/setup-ci-python
         with:
-          python-version: "3.13.2"
+          python-version: "3.14"
       - name: Run Ruff checks
         run: ruff check --config .github/cicd/pyproject.toml custom_components/tesla_fleet_telemetry/
       - name: Run format check

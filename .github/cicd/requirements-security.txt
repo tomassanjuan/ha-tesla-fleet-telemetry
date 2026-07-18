@@ -1,6 +1,6 @@
 # Runtime dependencies for the Tesla Fleet Telemetry integration only.
 # Keep this file aligned with custom_components/tesla_fleet_telemetry/manifest.json.
 
-paho-mqtt==2.1.0
+paho-mqtt>=2.1.0
 qrcode[png]>=8.2
-tesla-fleet-api==1.4.7
+tesla-fleet-api>=1.7.5
