@@ -25,7 +25,6 @@ REQUIRED_MANIFEST_FIELDS = [
     "config_flow",
     "documentation",
     "issue_tracker",
-    "homeassistant",
 ]
 
 
