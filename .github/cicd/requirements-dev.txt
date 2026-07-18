@@ -2,7 +2,7 @@
 # Install with: pip install -r .github/cicd/requirements-dev.txt
 
 # Core dependencies
-paho-mqtt>=2.1.0,<3
+paho-mqtt>=2.1.0
 tesla-fleet-api>=1.7.5
 
 # Home Assistant (for type hints)
@@ -12,7 +12,7 @@ homeassistant>=2026.0.0
 ruff>=0.3.0
 
 # Type checking
-mypy==1.9.0
+mypy>=1.9.0
 types-PyYAML
 
 # Testing
