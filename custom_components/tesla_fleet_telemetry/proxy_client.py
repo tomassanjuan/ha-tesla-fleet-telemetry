@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import ssl
@@ -195,6 +196,7 @@ class TeslaProxyClient:
         self._session: aiohttp.ClientSession | None = None
         self._api: TeslaFleetApi | None = None
         self._vehicle: VehicleFleet | None = None
+        self._wake_task: asyncio.Task[dict] | None = None
 
     async def async_setup(self) -> None:
         """Create the shared HTTP session and Fleet API client pointed at the proxy."""
@@ -464,7 +466,23 @@ class TeslaProxyClient:
         return data
 
     async def wake_vehicle(self, access_token: str) -> dict:
-        """POST wake_up through the local proxy's vehicle wake endpoint."""
+        """POST wake_up through the local proxy's vehicle wake endpoint.
+
+        Concurrent callers (e.g. several command entities each retrying after
+        finding the vehicle asleep) share a single in-flight wake request
+        instead of each hammering the endpoint and tripping Tesla's rate limit.
+        """
+        if self._wake_task is not None and not self._wake_task.done():
+            return await asyncio.shield(self._wake_task)
+        self._wake_task = self._hass.async_create_task(
+            self._do_wake_vehicle(access_token), eager_start=False
+        )
+        try:
+            return await asyncio.shield(self._wake_task)
+        finally:
+            self._wake_task = None
+
+    async def _do_wake_vehicle(self, access_token: str) -> dict:
         self._check_ready()
         self._set_token(access_token)
         try:
