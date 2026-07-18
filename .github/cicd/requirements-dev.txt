@@ -3,7 +3,7 @@
 
 # Core dependencies
 paho-mqtt>=2.1.0,<3
-tesla-fleet-api==1.4.7
+tesla-fleet-api>=1.7.5
 
 # Home Assistant (for type hints)
 homeassistant>=2026.0.0
