@@ -37,9 +37,8 @@ BUTTON_DEFS: list[ButtonDef] = [
     ButtonDef("honk", "Honk", "mdi:bullhorn", "honk_horn"),
     ButtonDef("flash", "Flash", "mdi:car-light-high", "flash_lights"),
     ButtonDef("wake", "Wake Vehicle", "mdi:sleep-off", "wake_up"),
-    # Body key is "sound" per developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands#remote-boombox
     ButtonDef("boombox", "Fart", "mdi:smoke", "remote_boombox", {"sound": 0}),
-    ButtonDef("locate", "Locate", "mdi:map-marker", "remote_boombox", {"sound": 2000}),
+    ButtonDef("locate", "Locate", "mdi:map-marker", "locate"),
 ]
 
 
@@ -97,6 +96,10 @@ class TeslaButton(CommandEntity, ButtonEntity):
         self._attr_icon = btn_def.icon
 
     async def async_press(self) -> None:
+        if self._btn_def.endpoint == "locate":
+            await self._send_command("flash_lights")
+            await self._send_command("honk_horn")
+            return
         result = await self._send_command(self._btn_def.endpoint, self._btn_def.body)
         if self._btn_def.endpoint == "wake_up":
             response = result.get("response") if isinstance(result, dict) else None
