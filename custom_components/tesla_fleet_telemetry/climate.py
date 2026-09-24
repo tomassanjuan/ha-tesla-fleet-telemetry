@@ -13,6 +13,7 @@ from homeassistant.components.climate.const import PRESET_NONE
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -258,7 +259,7 @@ class TeslaClimate(CommandEntity, ClimateEntity):
             return
         mode_int = _KEEPER_PRESET_TO_MODE.get(preset_mode)
         if mode_int is None:
-            raise ValueError(f"Unknown preset mode: {preset_mode}")
+            raise ServiceValidationError(f"Unknown preset mode: {preset_mode}")
         if was_defrost:
             await self._send_command("set_preconditioning_max", {"on": False})
         if preset_mode != PRESET_NONE:
@@ -385,7 +386,7 @@ class CabinOverheatClimate(CommandEntity, ClimateEntity):
         target = round(float(temperature) / 5.0) * 5.0
         command = _COP_TEMP_COMMANDS.get(target)
         if command is None:
-            raise ValueError(f"Unsupported COP temperature: {temperature}")
+            raise ServiceValidationError(f"Unsupported COP temperature: {temperature}")
 
         level, optimistic_state = command
         await self._send_command("set_cop_temp", {"cop_temp": level})

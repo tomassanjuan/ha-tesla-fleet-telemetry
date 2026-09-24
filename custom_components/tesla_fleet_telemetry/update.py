@@ -114,8 +114,17 @@ class TeslaFirmwareUpdate(CommandEntity, UpdateEntity):
         return _RELEASE_NOTES_BASE_URL.format(version=version)
 
     @property
+    def _update_pending(self) -> bool:
+        available = _normalize_version(self.coordinator.get_field("SoftwareUpdateVersion"))
+        return available is not None and available != self.installed_version
+
+    @property
     def in_progress(self) -> bool:
         """Show update in progress while downloading or installing."""
+        # Progress fields keep reporting 0 when no update is pending; without
+        # this gate the entity would sit "in progress" indefinitely.
+        if not self._update_pending:
+            return False
         download = self._download_percent_complete
         installation = self._installation_percent_complete
 
@@ -127,6 +136,8 @@ class TeslaFirmwareUpdate(CommandEntity, UpdateEntity):
     @property
     def update_percentage(self) -> int | None:
         """Return the active update progress percentage (download then installation)."""
+        if not self._update_pending:
+            return None
         download = self._download_percent_complete
         installation = self._installation_percent_complete
 

@@ -157,5 +157,7 @@ class TeslaConfigActionButton(ButtonEntity):
         except (ConfigEntryAuthFailed, TokenRevokedError):
             self._entry.async_start_reauth(self.hass)
             raise ServiceValidationError(_REAUTH_MESSAGE) from None
+        except ServiceValidationError:
+            raise
         except Exception as err:
             raise ServiceValidationError(f"Action failed: {err}") from err

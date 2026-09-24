@@ -171,23 +171,27 @@ class TeslaWindowsCover(CommandEntity, CoverEntity):
             return not any(_window_is_open(value) for value in known)
         return self._optimistic_is_closed
 
-    async def async_open_cover(self, **kwargs: Any) -> None:
+    def _window_command_body(self, command: str) -> dict[str, Any]:
+        # Tesla requires the requester's lat/lon near the car to *close* windows
+        # (vent ignores them); the vehicle's own location satisfies that check.
+        body: dict[str, Any] = {"command": command}
         location = self.coordinator.get_field("Location")
-        body: dict[str, Any] = {"command": "vent"}
         if isinstance(location, dict):
             latitude = location.get("latitude")
             longitude = location.get("longitude")
             if latitude is not None and longitude is not None:
                 body["lat"] = latitude
                 body["lon"] = longitude
+        return body
 
-        await self._send_command("window_control", body)
+    async def async_open_cover(self, **kwargs: Any) -> None:
+        await self._send_command("window_control", self._window_command_body("vent"))
         self._optimistic_is_closed = False
         for field in ("FdWindow", "FpWindow", "RdWindow", "RpWindow"):
             self.coordinator.async_update_field(field, "WindowStateVented")
 
     async def async_close_cover(self, **kwargs: Any) -> None:
-        await self._send_command("window_control", {"command": "close"})
+        await self._send_command("window_control", self._window_command_body("close"))
         self._optimistic_is_closed = True
         for field in ("FdWindow", "FpWindow", "RdWindow", "RpWindow"):
             self.coordinator.async_update_field(field, "WindowStateClosed")

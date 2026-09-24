@@ -13,7 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.issue_registry import async_delete_issue
 
-from .const import DOMAIN
+from .const import CONF_DOMAIN, CONF_TELEMETRY_SERVER_HOSTNAME, DOMAIN
 from .entity_registry import _fields_for_unique_id
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,6 +28,16 @@ def _find_entry_for_vin(hass: HomeAssistant, vin: str) -> tuple[str, Any] | None
         if entry_data is not None and getattr(entry_data, "vin", None) == vin:
             return entry.entry_id, entry_data
     return None
+
+
+def _pairing_url_for_entry(hass: HomeAssistant, entry_id: str) -> str | None:
+    """Rebuild the virtual-key pairing URL from the entry's registered domain."""
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None:
+        return None
+    merged = {**entry.data, **entry.options}
+    domain = merged.get(CONF_DOMAIN) or merged.get(CONF_TELEMETRY_SERVER_HOSTNAME)
+    return f"https://tesla.com/_ak/{domain}" if domain else None
 
 
 def _extract_key_paired(config: object) -> bool | None:
@@ -100,7 +110,7 @@ class VKeyNotPairedRepairFlow(RepairsFlow):
             found = _find_entry_for_vin(self.hass, vin)
             if found is None:
                 return self.async_abort(reason="entry_not_found")
-            _, entry_data = found
+            entry_id, entry_data = found
 
             try:
                 config = await entry_data.get_telemetry_config()
@@ -115,8 +125,10 @@ class VKeyNotPairedRepairFlow(RepairsFlow):
                         _LOGGER.debug("Config push after virtual key repair exception: %s", err)
                     return self.async_create_entry(title="", data={})
 
-                pairing_url = description_placeholders.get(
-                    "pairing_url", f"https://tesla.com/_ak/{vin}"
+                pairing_url = (
+                    description_placeholders.get("pairing_url")
+                    or _pairing_url_for_entry(self.hass, entry_id)
+                    or "https://tesla.com/_ak/"
                 )
                 return self.async_abort(
                     reason="still_not_paired",
@@ -146,8 +158,12 @@ class UnknownFieldRepairFlow(RepairsFlow):
         vin = str(issue_data.get("vin") or self.issue_id[len(prefix) : len(prefix) + _VIN_LENGTH])
         field = str(issue_data.get("field") or self.issue_id[len(prefix) + _VIN_LENGTH + 1 :])
 
-        if user_input is not None:
-            return self.async_create_entry(title="", data={})
+        if user_input is None:
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema({}),
+                description_placeholders={"vin": vin, "field": field},
+            )
 
         found = _find_entry_for_vin(self.hass, vin)
         if found is None:

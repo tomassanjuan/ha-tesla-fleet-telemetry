@@ -472,15 +472,23 @@ class TeslaProxyClient:
         finding the vehicle asleep) share a single in-flight wake request
         instead of each hammering the endpoint and tripping Tesla's rate limit.
         """
-        if self._wake_task is not None and not self._wake_task.done():
-            return await asyncio.shield(self._wake_task)
-        self._wake_task = self._hass.async_create_task(
-            self._do_wake_vehicle(access_token), eager_start=False
-        )
-        try:
-            return await asyncio.shield(self._wake_task)
-        finally:
+        if self._wake_task is None or self._wake_task.done():
+            task = self._hass.async_create_task(
+                self._do_wake_vehicle(access_token), eager_start=False
+            )
+            # Clear the shared task when it finishes rather than when the first
+            # caller returns: a cancelled caller must not let the next one start
+            # a second wake while this one is still in flight.
+            task.add_done_callback(self._on_wake_done)
+            self._wake_task = task
+        return await asyncio.shield(self._wake_task)
+
+    def _on_wake_done(self, task: asyncio.Task[dict]) -> None:
+        if self._wake_task is task:
             self._wake_task = None
+        if not task.cancelled():
+            # Mark the exception retrieved in case every awaiting caller was cancelled.
+            task.exception()
 
     async def _do_wake_vehicle(self, access_token: str) -> dict:
         self._check_ready()

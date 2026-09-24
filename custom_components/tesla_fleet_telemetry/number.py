@@ -67,8 +67,13 @@ class ChargeLimitNumber(CommandEntity, NumberEntity):
         await self._send_command("set_charge_limit", {"percent": int(value)})
 
 
+# Upper bound for the vehicle-reported ChargeCurrentRequestMax (48 A for most AC
+# chargers in North America; headroom for vehicles that report more).
+_CHARGE_AMPS_HARD_MAX = 80
+
+
 class ChargeAmpsNumber(CommandEntity, NumberEntity):
-    """Set charge amps (5–32A).
+    """Set charge amps (5 A up to the vehicle-reported maximum).
 
     native_max_value is cached in _attr_native_max_value and updated only when
     ChargeCurrentRequestMax actually changes. This avoids HA logging "capabilities
@@ -109,7 +114,7 @@ class ChargeAmpsNumber(CommandEntity, NumberEntity):
     def _on_max_changed(self, field: str, value: Any) -> None:
         if not isinstance(value, int | float):
             return
-        new_max = float(max(self._attr_native_min_value, min(int(value), 32)))
+        new_max = float(max(self._attr_native_min_value, min(int(value), _CHARGE_AMPS_HARD_MAX)))
         if new_max == self._attr_native_max_value:
             return
         self._attr_native_max_value = new_max
