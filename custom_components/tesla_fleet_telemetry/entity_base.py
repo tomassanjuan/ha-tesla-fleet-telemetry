@@ -62,12 +62,18 @@ class TelemetryEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
 
     @property
     def restored_state(self) -> str | None:
-        """Return restored HA state while MQTT has not delivered this field yet."""
-        return self._restored_state if self.raw_value is None else None
+        """Return restored HA state while MQTT has not delivered this field yet.
+
+        Once the field has been received — even as null/invalid — the live
+        value wins, so an invalid reading never shows a stale pre-restart state.
+        """
+        if self._field in self.coordinator.data:
+            return None
+        return self._restored_state
 
     @property
     def available(self) -> bool:
-        """Available when a live or restored value exists."""
+        """Available when a live or (not yet superseded) restored value exists."""
         return self.coordinator.last_update_success and (
-            self.raw_value is not None or self._restored_state is not None
+            self.raw_value is not None or self.restored_state is not None
         )

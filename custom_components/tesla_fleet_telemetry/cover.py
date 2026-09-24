@@ -210,7 +210,7 @@ def _window_is_open(value: object) -> bool:
             if normalized is not None
             else value.strip().strip('"').strip("'").lower()
         )
-        if lowered in {"open", "opened", "vent", "vented", "true", "on"}:
+        if lowered in {"open", "opened", "partiallyopen", "vent", "vented", "true", "on"}:
             return True
         if lowered in {"closed", "close", "false", "off"}:
             return False
