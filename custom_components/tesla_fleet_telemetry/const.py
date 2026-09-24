@@ -1786,6 +1786,70 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
     # --- TPMS ---
     TelemetryEntityDescription(
         binary=True,
+        key="TpmsHardWarningFl",
+        name="TPMS Hard Warning FL",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="TpmsHardWarningFr",
+        name="TPMS Hard Warning FR",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="TpmsHardWarningRl",
+        name="TPMS Hard Warning RL",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="TpmsHardWarningRr",
+        name="TPMS Hard Warning RR",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="TpmsSoftWarningFl",
+        name="TPMS Soft Warning FL",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="TpmsSoftWarningFr",
+        name="TPMS Soft Warning FR",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="TpmsSoftWarningRl",
+        name="TPMS Soft Warning RL",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="TpmsSoftWarningRr",
+        name="TPMS Soft Warning RR",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:tire-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
         key="TpmsHardWarnings",
         name="TPMS Hard Warning",
         device_class=BinarySensorDeviceClass.PROBLEM,
@@ -1926,6 +1990,22 @@ DERIVED_SENSOR_DESCRIPTIONS: tuple[DerivedSensorEntityDescription, ...] = (
 # ---------------------------------------------------------------------------
 
 
+# Per-tyre TPMS warnings are not Tesla telemetry fields (pushing them fails the
+# whole config). fleet-telemetry publishes TpmsHardWarnings/TpmsSoftWarnings as a
+# TireLocation object listing only the flagged tyres, e.g. {"front_left": true},
+# so the per-tyre entities are derived from it: child key -> (parent, tyre key).
+TPMS_WHEEL_FIELDS: dict[str, tuple[str, str]] = {
+    f"Tpms{kind}Warning{pos}": (f"Tpms{kind}Warnings", tyre)
+    for kind in ("Hard", "Soft")
+    for pos, tyre in (
+        ("Fl", "front_left"),
+        ("Fr", "front_right"),
+        ("Rl", "rear_left"),
+        ("Rr", "rear_right"),
+    )
+}
+
+
 @dataclass(frozen=True)
 class TelemetryEntityMapping:
     """Maps a unique_id suffix to its required telemetry fields and default-enabled state.
@@ -2046,14 +2126,9 @@ ENTITY_FIELD_MAPPINGS: dict[str, TelemetryEntityMapping] = {
             }
         )
     ),
-    # Per-wheel TPMS warnings are derived from the TireLocation-valued
-    # aggregate fields; Tesla has no per-wheel warning telemetry fields.
     **{
-        f"Tpms{kind}Warning{wheel}": TelemetryEntityMapping(
-            frozenset({f"Tpms{kind}Warnings"}), enabled_by_default=False
-        )
-        for kind in ("Hard", "Soft")
-        for wheel in ("Fl", "Fr", "Rl", "Rr")
+        child: TelemetryEntityMapping(frozenset({parent}), enabled_by_default=False)
+        for child, (parent, _) in TPMS_WHEEL_FIELDS.items()
     },
 }
 
@@ -2068,7 +2143,9 @@ MQTT_ONLY_FIELDS: set[str] = {
     "LastAlertTriggered",
 }
 
-SUPPORTED_STREAMING_FIELDS: set[str] = set(FIELD_DEFS.keys()) - MQTT_ONLY_FIELDS
+SUPPORTED_STREAMING_FIELDS: set[str] = (
+    set(FIELD_DEFS.keys()) - MQTT_ONLY_FIELDS - set(TPMS_WHEEL_FIELDS)
+)
 
 LOCATION_FIELDS: set[str] = {"Location"}
 

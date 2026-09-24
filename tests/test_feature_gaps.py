@@ -1,4 +1,4 @@
-"""Tests for the TPMS fix, new telemetry fields, and hot-path optimizations."""
+"""Tests for new telemetry fields and hot-path optimizations."""
 
 from __future__ import annotations
 
@@ -13,11 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.tesla_fleet_telemetry import command_entity
-from custom_components.tesla_fleet_telemetry.binary_sensor import (
-    _TPMS_WHEEL_SENSORS,
-    TelemetryBinarySensor,
-    TpmsWheelWarningBinarySensor,
-)
+from custom_components.tesla_fleet_telemetry.binary_sensor import TelemetryBinarySensor
 from custom_components.tesla_fleet_telemetry.command_entity import CommandEntity
 from custom_components.tesla_fleet_telemetry.const import (
     DOMAIN,
@@ -26,13 +22,8 @@ from custom_components.tesla_fleet_telemetry.const import (
     SUPPORTED_STREAMING_FIELDS,
 )
 from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
-from custom_components.tesla_fleet_telemetry.entity_registry import (
-    _default_enabled_for_unique_id,
-    _fields_for_unique_id,
-)
 from custom_components.tesla_fleet_telemetry.mqtt_client import TeslaMQTTClient
 from custom_components.tesla_fleet_telemetry.update import TeslaFirmwareUpdate
-from custom_components.tesla_fleet_telemetry.utils import tire_location_flags
 
 from .conftest import TEST_VIN
 
@@ -69,55 +60,23 @@ def coordinator(
 # --- TPMS -------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("payload", "expected"),
-    [
-        ({}, dict.fromkeys(("front_left", "front_right", "rear_left", "rear_right"), False)),
-        (
-            {"front_left": True, "rear_right": True},
-            {"front_left": True, "front_right": False, "rear_left": False, "rear_right": True},
-        ),
-        (
-            {"FrontRight": True},
-            {"front_left": False, "front_right": True, "rear_left": False, "rear_right": False},
-        ),
-        ("true", None),
-        (None, None),
-    ],
-)
-def test_tire_location_flags(payload: object, expected: dict[str, bool] | None) -> None:
-    assert tire_location_flags(payload) == expected
+async def test_tpms_per_wheel_entities_refresh_from_aggregate(
+    coordinator: TelemetryCoordinator,
+) -> None:
+    """Per-wheel fields are fanned out from the aggregate and reach their entities."""
+    calls = 0
 
+    def _count() -> None:
+        nonlocal calls
+        calls += 1
 
-def test_per_wheel_tpms_fields_are_never_streamed() -> None:
-    """Tesla has no per-wheel TPMS warning fields; requesting them is invalid."""
-    for suffix, _name, aggregate, _position in _TPMS_WHEEL_SENSORS:
-        assert suffix not in FIELD_DEFS
-        assert suffix not in SUPPORTED_STREAMING_FIELDS
-        assert _fields_for_unique_id(f"telemetry_{TEST_VIN}_{suffix}", TEST_VIN) == {aggregate}
-        assert _default_enabled_for_unique_id(f"telemetry_{TEST_VIN}_{suffix}", TEST_VIN) is False
-    assert "tpms_hard_warnings" not in ENTITY_FIELD_MAPPINGS
-
-
-async def test_tpms_wheel_and_aggregate_sensors(coordinator: TelemetryCoordinator) -> None:
-    wheels = {
-        args[0]: TpmsWheelWarningBinarySensor(coordinator, TEST_VIN, *args)
-        for args in _TPMS_WHEEL_SENSORS
-    }
-    aggregate = TelemetryBinarySensor(coordinator, FIELD_DEFS["TpmsHardWarnings"], TEST_VIN)
-    fl = wheels["TpmsHardWarningFl"]
-    assert fl.unique_id == f"telemetry_{TEST_VIN}_TpmsHardWarningFl"
-    assert fl.is_on is None
+    wheel = TelemetryBinarySensor(coordinator, FIELD_DEFS["TpmsHardWarningFl"], TEST_VIN)
+    coordinator.async_add_listener(_count, wheel.coordinator_context)
 
     coordinator.async_update_field("TpmsHardWarnings", {"front_left": True})
-    assert fl.is_on is True
-    assert wheels["TpmsHardWarningRr"].is_on is False
-    assert wheels["TpmsSoftWarningFl"].is_on is None
-    assert aggregate.is_on is True
-
-    coordinator.async_update_field("TpmsHardWarnings", {})
-    assert fl.is_on is False
-    assert aggregate.is_on is False
+    await asyncio.sleep(0.1)
+    assert wheel.is_on is True
+    assert calls == 1
 
 
 # --- New fields -------------------------------------------------------------

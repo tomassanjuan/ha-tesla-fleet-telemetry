@@ -11,11 +11,16 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, FIELD_DEFS
+from .const import DOMAIN, FIELD_DEFS, TPMS_WHEEL_FIELDS
 
 _LOGGER = logging.getLogger(__name__)
 
 _BURST_DEBOUNCE_SECONDS = 0.05
+
+# Parent TireLocation field -> [(per-tyre child field, tyre key)].
+_TPMS_CHILDREN: dict[str, list[tuple[str, str]]] = {}
+for _child, (_parent, _tyre) in TPMS_WHEEL_FIELDS.items():
+    _TPMS_CHILDREN.setdefault(_parent, []).append((_child, _tyre))
 
 
 class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -50,7 +55,10 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._unknown_fields_logged.add(field)
                 _LOGGER.warning("Unknown field updated: %s, ignoring", field)
             return
-        if self.data.get(field) == value:
+        # Store an explicit None too: "received but invalid" must be
+        # distinguishable from "never received" (entities only fall back to
+        # their restored state for the latter).
+        if field in self.data and self.data[field] == value:
             return
         # Mutate in place: copying the whole field dict on every MQTT message
         # is O(fields) per update and nothing holds on to a previous snapshot.
@@ -60,6 +68,10 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._field_events.setdefault(field, asyncio.Event()).set()
         self._notify_field_listeners(field, value)
         self._schedule_coordinator_update()
+        for child, tyre in _TPMS_CHILDREN.get(field, ()):
+            self.async_update_field(
+                child, bool(value.get(tyre)) if isinstance(value, dict) else None
+            )
 
     @callback
     def _schedule_coordinator_update(self) -> None:

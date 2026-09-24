@@ -2,10 +2,6 @@
 
 ## Unreleased
 
-Fixed:
-
-- TPMS warnings: per-wheel hard/soft warning sensors now read Tesla's `TpmsHardWarnings` / `TpmsSoftWarnings` fields (which report all four tyres together). The old per-wheel field names don't exist on Tesla's side and are no longer requested from the vehicle. The two combined TPMS sensors now show the correct on/off state.
-
 Added:
 
 - Battery sensors: Nominal Full Pack Energy, Lifetime Energy Charged, Lifetime Regen Energy, Brick SoC Min.

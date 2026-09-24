@@ -37,16 +37,14 @@ class TelemetryEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
         description: EntityDescription,
         vin: str,
         *,
-        field: str | None = None,
         extra_fields: frozenset[str] = frozenset(),
     ) -> None:
-        """Bind the entity to its telemetry field.
+        """Bind the entity to its telemetry field (description.key).
 
-        field defaults to description.key; pass it when the entity reads a
-        different field than its unique_id suffix. The entity is only
-        refreshed when field or one of extra_fields changes.
+        The entity is only refreshed when that field or one of extra_fields
+        changes.
         """
-        self._field = field or description.key
+        self._field = description.key
         super().__init__(coordinator, context=frozenset({self._field}) | extra_fields)
         self._vin = vin
         self._attr_unique_id = telemetry_unique_id(vin, description.key)
@@ -71,12 +69,18 @@ class TelemetryEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
 
     @property
     def restored_state(self) -> str | None:
-        """Return restored HA state while MQTT has not delivered this field yet."""
-        return self._restored_state if self.raw_value is None else None
+        """Return restored HA state while MQTT has not delivered this field yet.
+
+        Once the field has been received — even as null/invalid — the live
+        value wins, so an invalid reading never shows a stale pre-restart state.
+        """
+        if self._field in self.coordinator.data:
+            return None
+        return self._restored_state
 
     @property
     def available(self) -> bool:
-        """Available when a live or restored value exists."""
+        """Available when a live or (not yet superseded) restored value exists."""
         return self.coordinator.last_update_success and (
-            self.raw_value is not None or self._restored_state is not None
+            self.raw_value is not None or self.restored_state is not None
         )
