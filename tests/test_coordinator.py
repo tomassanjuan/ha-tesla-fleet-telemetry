@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Generator
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -22,8 +23,13 @@ def config_entry(hass: HomeAssistant) -> MockConfigEntry:
 
 
 @pytest.fixture
-def coordinator(hass: HomeAssistant, config_entry: MockConfigEntry) -> TelemetryCoordinator:
-    return TelemetryCoordinator(hass, config_entry, TEST_VIN)
+def coordinator(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> Generator[TelemetryCoordinator]:
+    coord = TelemetryCoordinator(hass, config_entry, TEST_VIN)
+    yield coord
+    # Field updates arm a debounce timer; HA's test harness fails on lingering timers.
+    coord.async_cancel_pending_update()
 
 
 def _a_real_field() -> str:

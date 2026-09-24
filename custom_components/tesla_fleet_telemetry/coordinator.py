@@ -86,11 +86,16 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except Exception:
                 _LOGGER.exception("Error updating entity for %s", self.vin)
 
-    async def async_shutdown(self) -> None:
-        """Cancel delayed listener updates during entry unload."""
+    @callback
+    def async_cancel_pending_update(self) -> None:
+        """Cancel a debounced listener notification that has not fired yet."""
         if self._notify_handle is not None:
             self._notify_handle.cancel()
             self._notify_handle = None
+
+    async def async_shutdown(self) -> None:
+        """Cancel delayed listener updates during entry unload."""
+        self.async_cancel_pending_update()
         await super().async_shutdown()
 
     @callback

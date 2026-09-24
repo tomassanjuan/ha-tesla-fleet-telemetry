@@ -125,9 +125,7 @@ class TeslaMQTTClient:
         self._errors_prefix = f"{topic_base}/{vin}/errors/"
         self._root_topic = f"{topic_base}/{vin}/#"
         self._client: mqtt.Client | None = None
-        self._reconnect_task: asyncio.Task | None = None
         self._running = False
-        self._backoff = MQTT_BACKOFF_BASE_SECONDS
         self._connect_lock = asyncio.Lock()
         self._seen_mqtt_errors: dict[str, tuple[str, float]] = {}
         self._error_cleanup_at = 0.0
@@ -143,6 +141,10 @@ class TeslaMQTTClient:
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_mqtt_message
+        client.on_connect_fail = self._on_connect_fail
+        # paho's network thread (loop_start) reconnects on its own after any
+        # disconnect or failed attempt; this sets its exponential backoff.
+        client.reconnect_delay_set(MQTT_BACKOFF_BASE_SECONDS, MQTT_BACKOFF_MAX_SECONDS)
         if self._username is not None:
             client.username_pw_set(self._username, self._password)
         if self._ssl_context is not None:
@@ -156,21 +158,22 @@ class TeslaMQTTClient:
         if reason_code == 0:
             _LOGGER.info("Tesla MQTT connected, subscribing to %s", self._root_topic)
             client.subscribe(self._root_topic, qos=1)
-            self._backoff = MQTT_BACKOFF_BASE_SECONDS
             self._finish_connect()
         else:
             _LOGGER.warning("Tesla MQTT connect failed: reason_code=%s", reason_code)
             self._finish_connect(OSError(f"MQTT connect failed: {reason_code}"))
 
+    def _on_connect_fail(self, client, userdata) -> None:
+        # TCP/TLS-level failure (refused, unreachable, handshake error).
+        self._finish_connect(OSError("MQTT broker connection failed"))
+
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties) -> None:
         self._finish_connect(OSError(f"MQTT disconnected: {reason_code}"))
         if self._running:
             _LOGGER.warning(
-                "Tesla MQTT disconnected (reason=%s), reconnecting in %ss",
+                "Tesla MQTT disconnected (reason=%s); paho will reconnect automatically",
                 reason_code,
-                self._backoff,
             )
-            self._schedule_reconnect()
 
     def _on_mqtt_message(self, client, userdata, msg) -> None:
         try:
@@ -235,22 +238,6 @@ class TeslaMQTTClient:
         field = topic[len(self._topic_prefix) :]
         self._hass.loop.call_soon_threadsafe(self._on_message, field, value)
 
-    def _schedule_reconnect(self) -> None:
-        async def _reconnect() -> None:
-            await asyncio.sleep(self._backoff)
-            if not self._running:
-                return
-            self._backoff = min(self._backoff * 2, MQTT_BACKOFF_MAX_SECONDS)
-            await self.async_connect()
-
-        def _start() -> None:
-            if not self._running:
-                return
-            if self._reconnect_task is None or self._reconnect_task.done():
-                self._reconnect_task = self._hass.loop.create_task(_reconnect())
-
-        self._hass.loop.call_soon_threadsafe(_start)
-
     def _finish_connect(self, err: Exception | None = None) -> None:
         waiter = self._connect_waiter
         if waiter is None or waiter.done():
@@ -267,7 +254,11 @@ class TeslaMQTTClient:
         self._hass.loop.call_soon_threadsafe(_finish)
 
     async def async_connect(self) -> None:
-        """Connect (or reconnect) to the MQTT broker."""
+        """Connect to the broker; raise if the first connection does not succeed.
+
+        After the first successful connection paho's network thread owns
+        reconnection, so this is only called once, during entry setup.
+        """
         async with self._connect_lock:
             self._running = True
 
@@ -291,35 +282,19 @@ class TeslaMQTTClient:
                     timeout=self._timeout_seconds,
                 )
             except TimeoutError as err:
-                if self._reconnect_task is None:
-                    self._running = False
-                    raise TimeoutError("MQTT connect timed out") from err
-                _LOGGER.error("Tesla MQTT reconnect timed out — will retry")
-                self._reconnect_task = None
-                self._schedule_reconnect()
-            except Exception as err:
-                if self._reconnect_task is None:
-                    self._running = False
-                    raise
-                _LOGGER.error("Tesla MQTT reconnect error: %s — will retry", err)
-                self._reconnect_task = None
-                self._schedule_reconnect()
+                self._running = False
+                raise TimeoutError("MQTT connect timed out") from err
+            except Exception:
+                self._running = False
+                raise
             finally:
                 self._connect_waiter = None
 
     async def async_disconnect(self) -> None:
-        """Clean shutdown — stop reconnect loop and disconnect."""
+        """Clean shutdown — stop paho's network thread and disconnect."""
         self._running = False
         if self._connect_waiter and not self._connect_waiter.done():
             self._connect_waiter.cancel()
-        if self._reconnect_task and not self._reconnect_task.done():
-            self._reconnect_task.cancel()
-            try:
-                await self._reconnect_task
-            except asyncio.CancelledError:
-                pass
-            finally:
-                self._reconnect_task = None
         if self._client:
             client, self._client = self._client, None
             try:

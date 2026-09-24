@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -52,8 +53,13 @@ def config_entry(hass: HomeAssistant) -> MockConfigEntry:
 
 
 @pytest.fixture
-def coordinator(hass: HomeAssistant, config_entry: MockConfigEntry) -> TelemetryCoordinator:
-    return TelemetryCoordinator(hass, config_entry, TEST_VIN)
+def coordinator(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> Generator[TelemetryCoordinator]:
+    coord = TelemetryCoordinator(hass, config_entry, TEST_VIN)
+    yield coord
+    # Field updates arm a debounce timer; HA's test harness fails on lingering timers.
+    coord.async_cancel_pending_update()
 
 
 def _sensor(hass: HomeAssistant, coordinator: TelemetryCoordinator, key: str) -> TelemetrySensor:

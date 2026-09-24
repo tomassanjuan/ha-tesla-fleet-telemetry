@@ -33,6 +33,7 @@ from .const import (
     CONF_MQTT_TOPIC_BASE,
     CONF_MQTT_USERNAME,
     CONF_PROXY_URL,
+    CONF_PROXY_VERIFY_SSL,
     CONF_TELEMETRY_MODE,
     CONF_TELEMETRY_SERVER_CA,
     CONF_TELEMETRY_SERVER_HOSTNAME,
@@ -242,7 +243,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
         _LOGGER.error("Proxy URL is required but not configured")
         await mqtt_client.async_disconnect()
         raise ConfigEntryError("Proxy URL not configured")
-    proxy_client = TeslaProxyClient(hass, proxy_url, vin, timeout_seconds=connection_timeout)
+    proxy_client = TeslaProxyClient(
+        hass,
+        proxy_url,
+        vin,
+        timeout_seconds=connection_timeout,
+        verify_ssl=bool(_opts.get(CONF_PROXY_VERIFY_SSL)),
+    )
     try:
         await proxy_client.async_setup()
     except Exception:

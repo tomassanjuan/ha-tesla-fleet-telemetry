@@ -45,18 +45,16 @@ Tests: `tests/test_audit_wave4.py` covers region detection, full-chain vs leaf-o
 fetch (against a local TLS server with a generated CA → leaf chain), and MQTT
 credential, TLS and client-id wiring.
 
-## Still open
+## Final pass (remaining low-priority findings)
 
-- **Two MQTT reconnect loops.** paho's `loop_start()` thread already reconnects after
-  `connect_async`, and `_schedule_reconnect` also calls `connect_async`. It works, but
-  paho's own `reconnect_delay_set()` would be simpler.
-- **Proxy TLS verification is always off** (`_INSECURE_SSL`). This is fine for the
-  documented localhost/self-signed proxy, but an optional CA would help a remote proxy.
-- `set_temps` always sets the passenger temperature equal to the driver's.
-- The reauth "invalid token" check matches message substrings instead of exception types.
-- The config flow and `oauth2.py` create ad-hoc `aiohttp.ClientSession`s instead of
-  HA's shared session.
-- `hacs.json` / `requirements-dev.txt` use `2026.0.0`. It resolves to 2026.1+ but reads
-  like a typo.
-- CI pins Python 3.14. The preinstalled 3.14 RC breaks inside `mashumaro`; tests were
-  run on 3.13.
+| # | Finding | Resolution |
+|---|---------|-----------|
+| 23 | **Two MQTT reconnect loops.** paho's network thread and our `_schedule_reconnect` both reconnected. | Our loop is removed. paho owns reconnection, with `reconnect_delay_set(1, 60)`. `on_connect_fail` now fails the *initial* connect straight away, so setup no longer waits out the whole timeout. |
+| 24 | **Proxy TLS verification always off.** | New "Verify proxy TLS certificate" option (default off, for the usual self-signed proxy). When on, it uses HA's system-trusted client context, and the form reports a distinct `proxy_cert_invalid` error. |
+| 25 | **`set_temps` overwrote the passenger temperature with the driver's.** | The passenger's current setpoint is kept; it falls back to the driver value only when unknown. |
+| 26 | **Reauth token check matched message substrings.** | `async_fetch_available_vins` raises `TeslaAuthError` for HTTP 401/403, and reauth catches that type. |
+| 27 | **Ad-hoc `aiohttp.ClientSession`s** in `oauth2.py` and the config flow's proxy check. | They now use HA's shared session (`async_get_clientsession`). |
+| 28 | **`2026.0.0` version pins.** | Corrected to `2026.1.0`, the same effective floor as a valid calver. |
+| 29 | **CI red on `main` since before this audit.** Tests failed with "Lingering timer" (newer HA test harness), and mypy couldn't parse HA's Python 3.14 syntax. | Test fixtures cancel the coordinator's debounce timer (new `async_cancel_pending_update()`). mypy `python_version` is now 3.14, matching CI. |
+
+No findings from this audit remain open.

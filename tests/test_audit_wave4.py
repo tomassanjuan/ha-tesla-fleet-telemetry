@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import ipaddress
 import socket
@@ -16,15 +17,25 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
+from homeassistant.exceptions import HomeAssistantError
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from tesla_fleet_api.exceptions import InternalServerError, InvalidToken
 
 from custom_components.tesla_fleet_telemetry import oauth2
+from custom_components.tesla_fleet_telemetry.climate import TeslaClimate
+from custom_components.tesla_fleet_telemetry.const import (
+    MQTT_BACKOFF_BASE_SECONDS,
+    MQTT_BACKOFF_MAX_SECONDS,
+)
+from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
 from custom_components.tesla_fleet_telemetry.mqtt_client import TeslaMQTTClient
+from custom_components.tesla_fleet_telemetry.proxy_client import TeslaProxyClient
 from custom_components.tesla_fleet_telemetry.utils import _fetch_server_ca_blocking
 
 from .conftest import TEST_VIN
 
 
-async def test_vin_fetch_uses_detected_region() -> None:
+async def test_vin_fetch_uses_detected_region(hass) -> None:
     """The VIN list must come from the account's regional host, which is returned too."""
     na = "https://fleet-api.prd.na.vn.cloud.tesla.com"
     api = MagicMock()
@@ -38,7 +49,7 @@ async def test_vin_fetch_uses_detected_region() -> None:
     api._request = AsyncMock(return_value={"response": [{"vin": TEST_VIN.lower()}]})
 
     with patch.object(oauth2, "TeslaFleetApi", return_value=api):
-        vins, api_base = await oauth2.async_fetch_available_vins("token")
+        vins, api_base = await oauth2.async_fetch_available_vins(hass, "token")
 
     assert vins == [TEST_VIN]
     assert api_base == na
@@ -191,3 +202,83 @@ def test_mqtt_client_defaults_to_anonymous(hass) -> None:
     paho = client._build_client()
     assert paho._username is None
     assert paho._ssl_context is None
+
+
+async def test_vin_fetch_maps_rejected_token_to_auth_error(hass) -> None:
+    """Reauth relies on the exception type, not on the message text."""
+    api = MagicMock()
+    api.find_server = AsyncMock(side_effect=InvalidToken())
+
+    with (
+        patch.object(oauth2, "TeslaFleetApi", return_value=api),
+        pytest.raises(oauth2.TeslaAuthError),
+    ):
+        await oauth2.async_fetch_available_vins(hass, "token")
+
+
+async def test_vin_fetch_server_error_is_not_auth_error(hass) -> None:
+    api = MagicMock()
+    api.find_server = AsyncMock(side_effect=InternalServerError())
+
+    with patch.object(oauth2, "TeslaFleetApi", return_value=api):
+        with pytest.raises(HomeAssistantError) as exc_info:
+            await oauth2.async_fetch_available_vins(hass, "token")
+    assert not isinstance(exc_info.value, oauth2.TeslaAuthError)
+
+
+@pytest.mark.parametrize("verify", [False, True])
+async def test_proxy_client_tls_verification_toggle(hass, verify: bool) -> None:
+    client = TeslaProxyClient(hass, "https://proxy.local:4443", TEST_VIN, verify_ssl=verify)
+    await client.async_setup()
+    try:
+        ctx = client._session.connector._ssl  # type: ignore[union-attr]
+        assert ctx.verify_mode == (ssl.CERT_REQUIRED if verify else ssl.CERT_NONE)
+    finally:
+        await client.async_close()
+
+
+async def test_set_temperature_keeps_passenger_setpoint(hass) -> None:
+    entry = MockConfigEntry(domain="tesla_fleet_telemetry", unique_id=TEST_VIN)
+    entry.add_to_hass(hass)
+    coordinator = TelemetryCoordinator(hass, entry, TEST_VIN)
+    climate = TeslaClimate(coordinator, TEST_VIN, MagicMock(), MagicMock(), entry)
+    climate._send_command = AsyncMock(return_value={})
+    coordinator.async_update_field("HvacRightTemperatureRequest", 19.5)
+
+    await climate.async_set_temperature(temperature=22.0)
+
+    climate._send_command.assert_awaited_once_with(
+        "set_temps", {"driver_temp": 22.0, "passenger_temp": 19.5}
+    )
+    coordinator.async_cancel_pending_update()
+
+
+def test_mqtt_client_lets_paho_own_reconnect(hass) -> None:
+    client = TeslaMQTTClient(
+        hass, host="mqtt.local", port=1883, vin=TEST_VIN, on_message=MagicMock()
+    )
+    paho = client._build_client()
+    assert paho._reconnect_min_delay == MQTT_BACKOFF_BASE_SECONDS
+    assert paho._reconnect_max_delay == MQTT_BACKOFF_MAX_SECONDS
+    assert not hasattr(client, "_schedule_reconnect")
+
+
+async def test_mqtt_connect_fail_fails_setup_fast(hass) -> None:
+    """A refused connection must fail setup at once, not after the full timeout."""
+    client = TeslaMQTTClient(
+        hass,
+        host="mqtt.local",
+        port=1883,
+        vin=TEST_VIN,
+        on_message=MagicMock(),
+        timeout_seconds=30,
+    )
+    paho = MagicMock()
+    paho.is_connected.return_value = False
+    paho.connect_async.side_effect = lambda *a, **kw: client._on_connect_fail(paho, None)
+
+    with patch.object(client, "_build_client", return_value=paho):
+        async with asyncio.timeout(2):
+            with pytest.raises(OSError, match="connection failed"):
+                await client.async_connect()
+    await client.async_disconnect()

@@ -41,13 +41,15 @@
           "domain": "Application Domain",
           "mqtt_username": "MQTT Username",
           "mqtt_password": "MQTT Password",
-          "mqtt_tls": "Use TLS for MQTT"
+          "mqtt_tls": "Use TLS for MQTT",
+          "proxy_verify_ssl": "Verify proxy TLS certificate"
         },
         "data_description": {
           "domain": "Your app's root domain from developer.tesla.com allowed_origins. Used for partner account registration and the virtual key pairing URL.",
           "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla).",
           "mqtt_username": "Leave empty if your broker allows anonymous connections.",
-          "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store."
+          "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store.",
+          "proxy_verify_ssl": "Enable only if the proxy uses a publicly trusted certificate. Leave off for the usual self-signed proxy certificate."
         }
       }
     },
@@ -67,7 +69,8 @@
       "token_exchange_failed": "Failed to exchange authorization code for tokens.",
       "missing_code": "Authorization code was not received.",
       "invalid_auth": "The new token is not valid. Ensure you are using the correct Tesla account and that the OAuth app has the required scopes, then try again.",
-      "partner_register_failed": "Tesla rejected the domain: {partner_error}"
+      "partner_register_failed": "Tesla rejected the domain: {partner_error}",
+      "proxy_cert_invalid": "The proxy's TLS certificate is not trusted. Use a publicly trusted certificate or turn off certificate verification."
     },
     "abort": {
       "already_configured": "This vehicle is already configured.",
@@ -103,13 +106,15 @@
           "domain": "Application Domain",
           "mqtt_username": "MQTT Username",
           "mqtt_password": "MQTT Password",
-          "mqtt_tls": "Use TLS for MQTT"
+          "mqtt_tls": "Use TLS for MQTT",
+          "proxy_verify_ssl": "Verify proxy TLS certificate"
         },
         "data_description": {
           "domain": "Your app's root domain from developer.tesla.com (e.g. yourdomain.com). Used for partner account registration and virtual key pairing.",
           "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla).",
           "mqtt_username": "Leave empty if your broker allows anonymous connections.",
-          "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store."
+          "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store.",
+          "proxy_verify_ssl": "Enable only if the proxy uses a publicly trusted certificate. Leave off for the usual self-signed proxy certificate."
         }
       }
     },
@@ -127,7 +132,8 @@
       "telemetry_server_rejected": "Tesla rejected the telemetry server settings. Review the values and try again.",
       "ca_fetch_failed": "Could not connect to the telemetry server to fetch the certificate. Check hostname, port, TLS certificate, and firewall.",
       "ca_hostname_mismatch": "Certificate fetched but hostname validation failed. The certificate must match the telemetry server hostname.",
-      "partner_register_failed": "Tesla rejected the domain: {partner_error}"
+      "partner_register_failed": "Tesla rejected the domain: {partner_error}",
+      "proxy_cert_invalid": "The proxy's TLS certificate is not trusted. Use a publicly trusted certificate or turn off certificate verification."
     },
     "abort": {
       "reauth_not_possible": "The pending options could not be applied. Open the options again."

@@ -13,6 +13,7 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
@@ -32,6 +33,7 @@ from .const import (
     CONF_MQTT_TOPIC_BASE,
     CONF_MQTT_USERNAME,
     CONF_PROXY_URL,
+    CONF_PROXY_VERIFY_SSL,
     CONF_TELEMETRY_MODE,
     CONF_TELEMETRY_SERVER_CA,
     CONF_TELEMETRY_SERVER_HOSTNAME,
@@ -48,6 +50,7 @@ from .const import (
 )
 from .oauth2 import (
     PartnerDomainError,
+    TeslaAuthError,
     TeslaOAuth2Implementation,
     async_check_partner_public_key,
     async_fetch_available_vins,
@@ -55,7 +58,7 @@ from .oauth2 import (
     async_get_valid_access_token,
     async_register_partner_domain,
 )
-from .proxy_client import _INSECURE_SSL, TeslaProxyClient
+from .proxy_client import TeslaProxyClient
 from .utils import (
     async_fetch_server_ca,
     extract_first_fields_config,
@@ -94,6 +97,7 @@ async def _async_verify_proxy_reachable(
     hass: HomeAssistant,
     proxy_url: str,
     timeout: int | None = None,
+    verify_ssl: bool = False,
 ) -> tuple[bool, str | None]:
     """Check if proxy is reachable. Returns (is_reachable, error_message)."""
     import aiohttp  # noqa: PLC0415
@@ -110,14 +114,16 @@ async def _async_verify_proxy_reachable(
         return False, "proxy_invalid_url"
 
     try:
-        connector = aiohttp.TCPConnector(ssl=_INSECURE_SSL)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.get(
-                proxy_url,
-                timeout=aiohttp.ClientTimeout(total=_timeout),
-            ):
-                # Proxy is reachable if we get any response, even 404
-                return True, None
+        session = async_get_clientsession(hass, verify_ssl=verify_ssl)
+        async with session.get(
+            proxy_url,
+            timeout=aiohttp.ClientTimeout(total=_timeout),
+        ):
+            # Proxy is reachable if we get any response, even 404
+            return True, None
+    except aiohttp.ClientConnectorCertificateError:
+        _LOGGER.debug("Proxy certificate verification failed for %s", proxy_url)
+        return False, "proxy_cert_invalid"
     except aiohttp.InvalidURL:
         _LOGGER.debug("Invalid proxy URL: %s", proxy_url)
         return False, "proxy_invalid_url"
@@ -138,11 +144,12 @@ async def _async_verify_connection_endpoints(
     mqtt_port: int,
     proxy_url: str,
     timeout: int | None = None,
+    verify_ssl: bool = False,
 ) -> dict[str, str]:
     """Check MQTT and proxy endpoints in parallel; return form errors."""
     mqtt_result, proxy_result = await asyncio.gather(
         _async_verify_mqtt_reachable(hass, mqtt_host, mqtt_port, timeout=timeout),
-        _async_verify_proxy_reachable(hass, proxy_url, timeout=timeout),
+        _async_verify_proxy_reachable(hass, proxy_url, timeout=timeout, verify_ssl=verify_ssl),
         return_exceptions=True,
     )
     errors: dict[str, str] = {}
@@ -309,9 +316,9 @@ def _build_user_schema(
     telemetry_endpoint: str = DEFAULT_TELEMETRY_SERVER_ENDPOINT,
     telemetry_mode: str = DEFAULT_TELEMETRY_MODE,
     domain: str = "",
-    mqtt_auth: dict[str, Any] | None = None,
+    previous: dict[str, Any] | None = None,
 ) -> vol.Schema:
-    """Build the setup form schema."""
+    """Build the setup form schema; `previous` re-fills fields after a failed submit."""
     return vol.Schema(
         {
             vol.Optional(CONF_DOMAIN, default=domain): str,
@@ -320,9 +327,13 @@ def _build_user_schema(
                 TELEMETRY_MODE_OPTIONS
             ),
             vol.Required(CONF_MQTT_ENDPOINT, default=mqtt_endpoint): str,
-            **_mqtt_auth_schema(mqtt_auth or {}),
+            **_mqtt_auth_schema(previous or {}),
             vol.Optional(CONF_MQTT_TOPIC_BASE, default=DEFAULT_MQTT_TOPIC_BASE): str,
             vol.Required(CONF_PROXY_URL, default=proxy_url): str,
+            vol.Optional(
+                CONF_PROXY_VERIFY_SSL,
+                default=bool((previous or {}).get(CONF_PROXY_VERIFY_SSL, False)),
+            ): bool,
         }
     )
 
@@ -368,6 +379,10 @@ def _build_options_schema(merged: dict[str, Any]) -> vol.Schema:
                 default=_display_proxy_url(merged.get(CONF_PROXY_URL, "")),
             ): str,
             vol.Optional(
+                CONF_PROXY_VERIFY_SSL,
+                default=bool(merged.get(CONF_PROXY_VERIFY_SSL, False)),
+            ): bool,
+            vol.Optional(
                 CONF_CONNECTION_TIMEOUT,
                 default=merged.get(CONF_CONNECTION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT),
             ): vol.All(vol.Coerce(int), vol.Range(min=5, max=60)),
@@ -387,6 +402,7 @@ def _normalize_connection_input(user_input: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _async_try_partner_registration(
+    hass: HomeAssistant,
     client_id: str,
     client_secret: str,
     domain: str,
@@ -403,7 +419,7 @@ async def _async_try_partner_registration(
     )
     try:
         # Partner tokens and registrations are per region: use the account's host.
-        token = await async_fetch_partner_token(client_id, client_secret, api_base)
+        token = await async_fetch_partner_token(hass, client_id, client_secret, api_base)
         _LOGGER.debug("Partner token obtained for domain: %s", domain)
     except Exception as err:
         _LOGGER.warning(
@@ -414,7 +430,7 @@ async def _async_try_partner_registration(
         return None
 
     try:
-        await async_register_partner_domain(token, domain, api_base)
+        await async_register_partner_domain(hass, token, domain, api_base)
         _LOGGER.info("Partner domain registered with Tesla: %s", domain)
     except PartnerDomainError as err:
         _LOGGER.warning(
@@ -432,7 +448,7 @@ async def _async_try_partner_registration(
         return None
 
     try:
-        await async_check_partner_public_key(token, domain, api_base)
+        await async_check_partner_public_key(hass, token, domain, api_base)
         _LOGGER.info("Partner public key verified for domain: %s", domain)
     except Exception as err:
         _LOGGER.warning(
@@ -585,6 +601,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                 normalized_input[CONF_MQTT_HOST],
                 normalized_input[CONF_MQTT_PORT],
                 proxy_url,
+                verify_ssl=bool(normalized_input.get(CONF_PROXY_VERIFY_SSL)),
             )
         )
         if errors:
@@ -624,7 +641,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         DEFAULT_TELEMETRY_MODE,
                     ),
                     domain=user_input.get(CONF_DOMAIN, ""),
-                    mqtt_auth=user_input,
+                    previous=user_input,
                 ),
                 errors=errors,
             )
@@ -654,7 +671,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         DEFAULT_TELEMETRY_MODE,
                     ),
                     domain=normalized_input.get(CONF_DOMAIN, ""),
-                    mqtt_auth=normalized_input,
+                    previous=normalized_input,
                 ),
                 errors={"base": "ca_fetch_failed"},
             )
@@ -679,7 +696,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         DEFAULT_TELEMETRY_MODE,
                     ),
                     domain=normalized_input.get(CONF_DOMAIN, ""),
-                    mqtt_auth=normalized_input,
+                    previous=normalized_input,
                 ),
                 errors={"base": "ca_hostname_mismatch"},
             )
@@ -708,7 +725,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         CONF_TELEMETRY_MODE, DEFAULT_TELEMETRY_MODE
                     ),
                     domain=self._user_input.get(CONF_DOMAIN, ""),
-                    mqtt_auth=self._user_input,
+                    previous=self._user_input,
                 ),
                 errors={CONF_DOMAIN: reg_error_key},
                 description_placeholders={"partner_error": reg_error_detail},
@@ -762,28 +779,15 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             reauth_vins: list[str] | None = None
             try:
                 reauth_vins, self._fleet_api_base = await async_fetch_available_vins(
-                    token["access_token"]
+                    self.hass, token["access_token"]
+                )
+            except TeslaAuthError as err:
+                _LOGGER.warning("Reauth token validation failed: %s", err)
+                return self.async_show_form(
+                    step_id="reauth_confirm",
+                    errors={"base": "invalid_auth"},
                 )
             except Exception as err:
-                err_str = str(err).lower()
-                if any(
-                    k in err_str
-                    for k in (
-                        "401",
-                        "403",
-                        "unauthorized",
-                        "forbidden",
-                        "invalid_token",
-                    )
-                ):
-                    _LOGGER.warning(
-                        "Reauth token validation failed: %s",
-                        err,
-                    )
-                    return self.async_show_form(
-                        step_id="reauth_confirm",
-                        errors={"base": "invalid_auth"},
-                    )
                 # Non-auth error (network, 5xx) — proceed and let the integration retry
                 _LOGGER.debug("Reauth VIN validation skipped due to transient error: %s", err)
             if reauth_vins is not None and self.reauth_entry.data[CONF_VIN] not in reauth_vins:
@@ -805,7 +809,9 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             )
 
         try:
-            vins, self._fleet_api_base = await async_fetch_available_vins(token["access_token"])
+            vins, self._fleet_api_base = await async_fetch_available_vins(
+                self.hass, token["access_token"]
+            )
         except Exception as err:
             _LOGGER.error("Failed to fetch VINs from Fleet API: %s", err)
             return self.async_abort(reason="vin_fetch_failed")
@@ -853,7 +859,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             )
             return None
         return await _async_try_partner_registration(
-            client_id, client_secret, domain, self._fleet_api_base
+            self.hass, client_id, client_secret, domain, self._fleet_api_base
         )
 
     async def _async_proceed_to_vin_or_telemetry(self) -> ConfigFlowResult:
@@ -889,6 +895,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             self.hass,
             self._user_input[CONF_PROXY_URL],
             vin,
+            verify_ssl=bool(self._user_input.get(CONF_PROXY_VERIFY_SSL)),
         )
         try:
             await proxy_client.async_setup()
@@ -1012,10 +1019,12 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
             self._entry,
             implementation,
         )
+        merged = {**self._entry.data, **self._entry.options}
         proxy_client = TeslaProxyClient(
             self.hass,
-            self._entry.options.get(CONF_PROXY_URL, self._entry.data[CONF_PROXY_URL]),
+            merged[CONF_PROXY_URL],
             self._entry.data[CONF_VIN],
+            verify_ssl=bool(merged.get(CONF_PROXY_VERIFY_SSL)),
         )
         await proxy_client.async_setup()
         try:
@@ -1062,6 +1071,7 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
                     mqtt_port,
                     proxy_url,
                     timeout=timeout,
+                    verify_ssl=bool(user_input.get(CONF_PROXY_VERIFY_SSL)),
                 )
             )
 
@@ -1141,6 +1151,7 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
             )
             return None
         return await _async_try_partner_registration(
+            self.hass,
             client_id,
             client_secret,
             new_domain,
