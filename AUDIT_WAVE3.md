@@ -30,51 +30,31 @@ against the pre-fix code.
 | 15 | `strings.json` / `en.json` | Missing text for the `reauth_successful` abort, the standard OAuth aborts, the options `reauth_not_possible` abort, and the new `wrong_account` abort. The `still_not_paired` text had drifted between the two files. | Added, and the two files are identical again. |
 | 16 | misc | `button.py` re-wrapped its own `ServiceValidationError` ("Action failed: Push skipped: …"). `climate.py`/`select.py` raised `ValueError` for bad user input. `diagnostics.py` used `get_event_loop()`. | `ServiceValidationError` is re-raised as is, bad input raises `ServiceValidationError`, and diagnostics uses `get_running_loop()`. |
 
-## Open findings (not changed — need a product decision or real-vehicle testing)
+## Follow-up pass (resolved open findings)
 
-### High impact
+| # | Finding | Resolution |
+|---|---------|-----------|
+| 17 | **Region hardcoded to EU.** NA/APAC accounts failed the setup VIN fetch; partner registration happened only in EU. | `async_fetch_available_vins` detects the account's regional host with `TeslaFleetApi.find_server()` (`/api/1/users/region`). The host is stored per entry as `fleet_api_base` (refreshed on reauth) and used for the partner token, domain registration and the public-key check. The OAuth `audience` stays on the default host, because the region isn't known until after sign-in. |
+| 18 | **Telemetry CA pinned only the leaf certificate**, so vehicles stopped trusting the server when the cert renewed. | `utils.async_fetch_server_ca` returns the full verified chain (leaf → root) for publicly trusted servers. On every startup the bootstrap re-fetches the chain and, if it differs, updates the stored CA before the startup push. Existing leaf-pinned entries migrate on their next restart. |
+| 19 | **No MQTT auth/TLS.** `docs/SETUP.md` recommends `allow_anonymous false` with "matching credentials in Home Assistant", but there were no credential fields. | Optional username, password (password selector) and "Use TLS" (HA's system-trusted client context) on the setup and options forms. Both new fields are redacted in diagnostics. |
+| 20 | **Fixed MQTT client id** made two HA instances evict each other in a loop. | Client id is `tesla_fleet_telemetry_<VIN>_<first 8 chars of the HA instance id>`. |
+| 21 | **Manual pushes bypassed the 30 s throttle.** | The throttle now covers every reason and reports "throttled, retry in Ns". *Reload Telemetry Data* deletes and then pushes, so it passes `force=True` to avoid leaving the vehicle with no config. |
+| 22 | Docs claimed a PEM certificate could be pasted manually, but no such field exists. | `SETUP.md`/`TROUBLESHOOTING.md` corrected. The renewal section now describes the automatic re-check. |
 
-- **Fleet API region is hardcoded to EU** (`const.FLEET_API_BASE =
-  fleet-api.prd.eu.vn.cloud.tesla.com`). It is used for the OAuth `audience`, partner
-  registration and public-key checks, and the setup VIN fetch. North America and
-  Asia-Pacific accounts get an out-of-region error at the VIN fetch (setup aborts with
-  `vin_fetch_failed`), and partner registration is done only for the EU region. The
-  docs don't mention the limitation. Options: a region selector in the config flow, or
-  auto-detection via `TeslaFleetApi.find_server()` (`/api/1/users/region`) with
-  registration in the detected region.
-- **The telemetry CA pins the leaf certificate.** `_async_fetch_server_cert` sends only
-  `chain[0]` (the server's own cert) as `ca`. When the cert renews (every 60–90 days
-  with Let's Encrypt), vehicles stop trusting the server until the user re-saves the
-  options. Tesla's docs describe `ca` as the chain that issued the server cert. Sending
-  the issuing intermediate/root, or re-checking the CA on startup and pushing again
-  when it changes, would avoid silent outages.
+Tests: `tests/test_audit_wave4.py` covers region detection, full-chain vs leaf-only CA
+fetch (against a local TLS server with a generated CA → leaf chain), and MQTT
+credential, TLS and client-id wiring.
 
-### Medium
+## Final pass (remaining low-priority findings)
 
-- **No MQTT authentication or TLS.** `TeslaMQTTClient` has no username, password or TLS
-  options, so the broker must allow anonymous plaintext access.
-- **Two MQTT reconnect loops.** paho's `loop_start()` thread already reconnects after
-  `connect_async`, and `_schedule_reconnect` calls `connect_async` on top of that.
-  Functionally it works; `reconnect_delay_set()` plus letting paho own reconnection
-  would be simpler.
-- **Fixed MQTT client id** (`tesla_fleet_telemetry_<VIN>`). A second HA instance, such
-  as a dev box, would kick the first off the broker in a loop.
-- **Proxy TLS verification is always off** (`_INSECURE_SSL`), even for a remote proxy.
-  An optional CA or "verify" toggle would help setups where the proxy isn't on
-  localhost.
-- **Manual pushes bypass the 30 s universal throttle.** The code comment says
-  "regardless of reason", but `reason == "manual"` skips it. Repeated button presses
-  can each push.
+| # | Finding | Resolution |
+|---|---------|-----------|
+| 23 | **Two MQTT reconnect loops.** paho's network thread and our `_schedule_reconnect` both reconnected. | Our loop is removed. paho owns reconnection, with `reconnect_delay_set(1, 60)`. `on_connect_fail` now fails the *initial* connect straight away, so setup no longer waits out the whole timeout. |
+| 24 | **Proxy TLS verification always off.** | New "Verify proxy TLS certificate" option (default off, for the usual self-signed proxy). When on, it uses HA's system-trusted client context, and the form reports a distinct `proxy_cert_invalid` error. |
+| 25 | **`set_temps` overwrote the passenger temperature with the driver's.** | The passenger's current setpoint is kept; it falls back to the driver value only when unknown. |
+| 26 | **Reauth token check matched message substrings.** | `async_fetch_available_vins` raises `TeslaAuthError` for HTTP 401/403, and reauth catches that type. |
+| 27 | **Ad-hoc `aiohttp.ClientSession`s** in `oauth2.py` and the config flow's proxy check. | They now use HA's shared session (`async_get_clientsession`). |
+| 28 | **`2026.0.0` version pins.** | Corrected to `2026.1.0`, the same effective floor as a valid calver. |
+| 29 | **CI red on `main` since before this audit.** Tests failed with "Lingering timer" (newer HA test harness), and mypy couldn't parse HA's Python 3.14 syntax. | Test fixtures cancel the coordinator's debounce timer (new `async_cancel_pending_update()`). mypy `python_version` is now 3.14, matching CI. |
 
-### Low
-
-- `set_temps` always sets the passenger temperature equal to the driver's.
-- The reauth "invalid token" check matches error-message substrings (`"401"`,
-  `"unauthorized"`) instead of exception types.
-- The config flow and `oauth2.py` create ad-hoc `aiohttp.ClientSession`s instead of
-  HA's shared session.
-- `_generate_qr_data_uri`'s docstring says SVG, but it produces PNG.
-- `hacs.json` / `requirements-dev.txt` use `2026.0.0` (HA calver has no `.0` month).
-  It resolves to 2026.1+, but reads like a typo.
-- CI pins Python 3.14. Local runs against the preinstalled 3.14 RC fail inside
-  `mashumaro` (`typing.ByteString` was removed); Python 3.13 works.
+No findings from this audit remain open.

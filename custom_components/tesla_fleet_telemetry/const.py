@@ -83,6 +83,8 @@ FLEET_API_VERSION = "api/1"
 # OAuth2 endpoints
 OAUTH_TOKEN_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token"
 OAUTH_AUTHORIZE_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/authorize"
+# Default Fleet API host. The account's actual regional host is detected during
+# setup/reauth and stored per entry under CONF_FLEET_API_BASE.
 FLEET_API_BASE = "https://fleet-api.prd.eu.vn.cloud.tesla.com"
 
 OAUTH_SCOPES = (
@@ -94,10 +96,15 @@ OAUTH_SCOPES = (
 CONF_VIN = "vin"
 CONF_MQTT_HOST = "mqtt_host"
 CONF_MQTT_PORT = "mqtt_port"
+CONF_MQTT_USERNAME = "mqtt_username"
+CONF_MQTT_PASSWORD = "mqtt_password"
+CONF_MQTT_TLS = "mqtt_tls"
 CONF_PROXY_URL = "proxy_url"
+CONF_PROXY_VERIFY_SSL = "proxy_verify_ssl"
 CONF_CLIENT_ID = "client_id"
 CONF_CLIENT_SECRET = "client_secret"
 CONF_DOMAIN = "domain"
+CONF_FLEET_API_BASE = "fleet_api_base"
 
 
 # Platforms

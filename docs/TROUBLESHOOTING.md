@@ -150,7 +150,8 @@ nc -vz telemetry.example.com 19855
 openssl s_client -connect telemetry.example.com:19855 -servername telemetry.example.com </dev/null
 ```
 
-If automatic fetch still fails, paste the PEM certificate manually in Home Assistant.
+The certificate must be publicly trusted and match the hostname; self-signed certificates
+are not accepted.
 
 ## Common Error Meanings
 

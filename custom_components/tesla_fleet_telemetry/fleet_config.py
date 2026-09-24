@@ -169,7 +169,7 @@ def _parse_fleet_telemetry_error_created_at(value: object) -> datetime | None:
 
 
 def _generate_qr_data_uri(data: str) -> str:
-    """Generate a QR code as an SVG data URI."""
+    """Generate a QR code as a PNG data URI."""
     import base64  # noqa: PLC0415
 
     import qrcode  # noqa: PLC0415

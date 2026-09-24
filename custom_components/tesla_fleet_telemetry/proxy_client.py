@@ -11,6 +11,7 @@ from typing import Any, cast
 import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util.ssl import client_context
 from tesla_fleet_api.const import Method
 from tesla_fleet_api.exceptions import (
     DeviceUnexpectedResponse,
@@ -35,7 +36,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# SSL context that skips cert verification for the local self-signed proxy cert.
+# SSL context that skips cert verification for the local self-signed proxy cert
+# (the default; entries can opt into verification with CONF_PROXY_VERIFY_SSL).
 _INSECURE_SSL = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 _INSECURE_SSL.check_hostname = False
 _INSECURE_SSL.verify_mode = ssl.CERT_NONE
@@ -188,8 +190,10 @@ class TeslaProxyClient:
         proxy_url: str,
         vin: str,
         timeout_seconds: int = DEFAULT_CONNECTION_TIMEOUT,
+        verify_ssl: bool = False,
     ) -> None:
         self._hass = hass
+        self._verify_ssl = verify_ssl
         self._proxy_url = proxy_url.rstrip("/")
         self._vin = vin
         self._timeout_seconds = timeout_seconds
@@ -200,7 +204,9 @@ class TeslaProxyClient:
 
     async def async_setup(self) -> None:
         """Create the shared HTTP session and Fleet API client pointed at the proxy."""
-        connector = aiohttp.TCPConnector(ssl=_INSECURE_SSL)
+        connector = aiohttp.TCPConnector(
+            ssl=client_context() if self._verify_ssl else _INSECURE_SSL
+        )
         self._session = aiohttp.ClientSession(
             connector=connector,
             timeout=aiohttp.ClientTimeout(total=self._timeout_seconds),

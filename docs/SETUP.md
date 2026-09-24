@@ -212,10 +212,17 @@ Example values:
 | Setting | Example |
 | --- | --- |
 | MQTT broker | `mqtt.local:1883` |
+| MQTT username / password | Leave empty for an anonymous broker |
+| Use TLS for MQTT | Enable for a TLS listener (e.g. `mqtt.local:8883`); the broker certificate must be publicly trusted |
 | Command proxy | `https://proxy.example.com:4443` |
 | Telemetry server | `telemetry.example.com:19855` |
 
-If Home Assistant cannot fetch the telemetry certificate automatically, paste the PEM certificate when asked.
+Home Assistant fetches the telemetry server's certificate chain automatically. The telemetry
+server must use a publicly trusted certificate whose name matches the hostname; setup stops
+with an error otherwise.
+
+Your Tesla account's region (North America, Europe or China) is detected automatically after
+sign-in, and the application domain is registered with Tesla in that region.
 
 ## 7. Validate The Setup
 
@@ -261,7 +268,9 @@ Renew certificates before they expire. After renewal:
 docker compose restart vehicle-command fleet-telemetry
 ```
 
-Then reload the integration or update options if the telemetry certificate changed.
+The integration re-checks the telemetry server's certificate chain every time it starts and
+pushes the updated chain to the vehicle if it changed, so restarting Home Assistant (or
+reloading the integration) after a renewal is enough.
 
 ## Multiple Vehicles
 

@@ -238,7 +238,14 @@ class TeslaClimate(CommandEntity, ClimateEntity):
         driver_temp = kwargs.get("temperature")
         if driver_temp is None:
             driver_temp = kwargs.get("target_temp_low")
-        passenger_temp = kwargs.get("target_temp_high") or driver_temp
+        passenger_temp = kwargs.get("target_temp_high")
+        if passenger_temp is None:
+            # set_temps needs both sides; keep the passenger's own setpoint rather
+            # than overwriting it with the driver's (the car applies its own
+            # dual-zone sync setting either way).
+            current = self.coordinator.get_field("HvacRightTemperatureRequest")
+            if isinstance(current, int | float) and not isinstance(current, bool):
+                passenger_temp = current
         if driver_temp is not None:
             d_temp = float(driver_temp)
             p_temp = float(passenger_temp) if passenger_temp is not None else d_temp

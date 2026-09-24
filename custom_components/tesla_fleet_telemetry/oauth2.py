@@ -11,8 +11,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from tesla_fleet_api.const import Method, Scope
-from tesla_fleet_api.exceptions import Forbidden, InvalidRequest, TeslaFleetError
+from tesla_fleet_api.exceptions import Forbidden, InvalidRequest, LibraryError, TeslaFleetError
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 
 from .const import (
@@ -43,6 +44,10 @@ _PARTNER_SCOPES: list[Scope] = [
 
 class PartnerDomainError(HomeAssistantError):
     """Tesla Fleet API rejected a partner domain registration request (4xx)."""
+
+
+class TeslaAuthError(HomeAssistantError):
+    """Tesla rejected the access token (HTTP 401/403)."""
 
 
 class TeslaOAuth2Implementation(config_entry_oauth2_flow.LocalOAuth2ImplementationWithPkce):
@@ -189,19 +194,19 @@ def _make_api(
 
 
 async def async_fetch_partner_token(
+    hass: HomeAssistant,
     client_id: str,
     client_secret: str,
     audience: str = FLEET_API_BASE,
 ) -> str:
     """Obtain a partner (client_credentials) access token from Tesla."""
-    async with aiohttp.ClientSession() as session:
-        api = _make_api(session, audience)
-        try:
-            result = await api.partner_login(client_id, client_secret, scopes=_PARTNER_SCOPES)
-        except TeslaFleetError as err:
-            raise HomeAssistantError(f"Partner token request failed: {err}") from err
-        except Exception as err:
-            raise HomeAssistantError(f"Partner token request failed: {err}") from err
+    api = _make_api(async_get_clientsession(hass), audience)
+    try:
+        result = await api.partner_login(client_id, client_secret, scopes=_PARTNER_SCOPES)
+    except TeslaFleetError as err:
+        raise HomeAssistantError(f"Partner token request failed: {err}") from err
+    except Exception as err:
+        raise HomeAssistantError(f"Partner token request failed: {err}") from err
 
     token = result.get("access_token")
     if not isinstance(token, str) or not token:
@@ -210,6 +215,7 @@ async def async_fetch_partner_token(
 
 
 async def async_register_partner_domain(
+    hass: HomeAssistant,
     partner_token: str,
     domain: str,
     api_base: str = FLEET_API_BASE,
@@ -220,55 +226,68 @@ async def async_register_partner_domain(
     so the caller can surface this as a form validation error.
     Raises HomeAssistantError on 5xx or unexpected errors.
     """
-    async with aiohttp.ClientSession() as session:
-        api = _make_api(session, api_base, access_token=partner_token)
-        try:
-            result = await api.partner.register(domain)
-            _LOGGER.debug("Partner domain registration response for %s: %s", domain, result)
-            return cast(dict[str, Any], result)
-        except (Forbidden, InvalidRequest) as err:
-            raise PartnerDomainError(f"Partner domain registration failed: {err}") from err
-        except TeslaFleetError as err:
-            if err.status is not None and 400 <= err.status < 500:
-                raise PartnerDomainError(
-                    f"Partner domain registration failed ({err.status}): {err}"
-                ) from err
-            raise HomeAssistantError(f"Partner domain registration server error: {err}") from err
+    api = _make_api(async_get_clientsession(hass), api_base, access_token=partner_token)
+    try:
+        result = await api.partner.register(domain)
+        _LOGGER.debug("Partner domain registration response for %s: %s", domain, result)
+        return cast(dict[str, Any], result)
+    except (Forbidden, InvalidRequest) as err:
+        raise PartnerDomainError(f"Partner domain registration failed: {err}") from err
+    except TeslaFleetError as err:
+        if err.status is not None and 400 <= err.status < 500:
+            raise PartnerDomainError(
+                f"Partner domain registration failed ({err.status}): {err}"
+            ) from err
+        raise HomeAssistantError(f"Partner domain registration server error: {err}") from err
 
 
 async def async_check_partner_public_key(
+    hass: HomeAssistant,
     partner_token: str,
     domain: str,
     api_base: str = FLEET_API_BASE,
 ) -> dict[str, Any]:
     """Verify the public key is registered for the domain."""
-    async with aiohttp.ClientSession() as session:
-        api = _make_api(session, api_base, access_token=partner_token)
-        try:
-            result = await api.partner.public_key(domain=domain)
-            _LOGGER.debug("Partner public key for domain %s: %s", domain, result)
-            return cast(dict[str, Any], result)
-        except TeslaFleetError as err:
-            raise HomeAssistantError(f"Partner public key check failed: {err}") from err
+    api = _make_api(async_get_clientsession(hass), api_base, access_token=partner_token)
+    try:
+        result = await api.partner.public_key(domain=domain)
+        _LOGGER.debug("Partner public key for domain %s: %s", domain, result)
+        return cast(dict[str, Any], result)
+    except TeslaFleetError as err:
+        raise HomeAssistantError(f"Partner public key check failed: {err}") from err
 
 
-async def async_fetch_available_vins(access_token: str) -> list[str]:
-    """Fetch available VINs for the authenticated account from Fleet API."""
-    async with aiohttp.ClientSession() as session:
-        api = TeslaFleetApi(
-            session=session,
-            server=FLEET_API_BASE,
-            access_token=access_token,
-            charging_scope=False,
-            energy_scope=False,
-            partner_scope=False,
-            user_scope=False,
-            vehicle_scope=False,
-        )
+async def async_fetch_available_vins(
+    hass: HomeAssistant, access_token: str
+) -> tuple[list[str], str]:
+    """Fetch available VINs for the account and the account's regional Fleet API base URL.
+
+    Tesla serves each account from one regional Fleet API host (NA, EU or CN) and
+    answers other regions with an out-of-region error, so the region is looked up
+    from /users/region before listing vehicles.
+    """
+    api = TeslaFleetApi(
+        session=async_get_clientsession(hass),
+        server=FLEET_API_BASE,
+        access_token=access_token,
+        charging_scope=False,
+        energy_scope=False,
+        partner_scope=False,
+        user_scope=True,
+        vehicle_scope=False,
+    )
+    try:
         try:
-            payload = await api._request(Method.GET, f"{FLEET_API_VERSION}/vehicles")
-        except TeslaFleetError as err:
-            raise HomeAssistantError(f"VIN fetch failed: {err}") from err
+            await api.find_server()
+        except LibraryError:
+            # No region answered for this account; fall back to the default host.
+            api.server = FLEET_API_BASE
+        payload = await api._request(Method.GET, f"{FLEET_API_VERSION}/vehicles")
+    except TeslaFleetError as err:
+        if err.status in (401, 403):
+            raise TeslaAuthError(f"Tesla rejected the access token: {err}") from err
+        raise HomeAssistantError(f"VIN fetch failed: {err}") from err
+    api_base = str(api.server or FLEET_API_BASE).rstrip("/")
 
     vins: list[str] = []
     response = payload.get("response", payload)
@@ -280,4 +299,4 @@ async def async_fetch_available_vins(access_token: str) -> list[str]:
             if isinstance(vin, str) and vin.strip():
                 vins.append(vin.strip().upper())
 
-    return list(dict.fromkeys(vins))
+    return list(dict.fromkeys(vins)), api_base
