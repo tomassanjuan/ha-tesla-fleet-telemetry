@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -14,6 +15,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DERIVED_SENSOR_DESCRIPTIONS,
@@ -60,6 +62,37 @@ def _battery_power_w(coordinator: TelemetryCoordinator) -> float | None:
     if not math.isfinite(power) or abs(power) > 1e6:
         return None
     return power
+
+
+def _epoch_to_datetime(seconds: float) -> datetime | None:
+    if not math.isfinite(seconds) or seconds <= 0:
+        return None
+    if seconds > 1e11:  # epoch milliseconds
+        seconds /= 1000
+    try:
+        return datetime.fromtimestamp(seconds, UTC)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _to_utc_datetime(value: object) -> datetime | None:
+    """Coerce a telemetry timestamp (ISO string or epoch s/ms) to an aware datetime."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return _epoch_to_datetime(float(value))
+    parsed: datetime | None = None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        text = value.strip().strip('"').strip("'")
+        try:
+            return _epoch_to_datetime(float(text))
+        except ValueError:
+            parsed = dt_util.parse_datetime(text)
+    if parsed is None:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
 
 def _pack_imbalance(coordinator: TelemetryCoordinator) -> float | None:
@@ -192,42 +225,61 @@ class TelemetrySensor(TelemetryEntity, SensorEntity):
         self.entity_description = description
 
     @property
+    def _is_timestamp(self) -> bool:
+        return self.entity_description.device_class == SensorDeviceClass.TIMESTAMP
+
+    @property
+    def _is_numeric(self) -> bool:
+        """Mirror HA's numeric-sensor rule: these must never report a string."""
+        desc = self.entity_description
+        return (
+            desc.native_unit_of_measurement is not None
+            or desc.state_class is not None
+            or desc.suggested_display_precision is not None
+        )
+
+    @property
     def native_value(self):
         val = self.raw_value
         if val is None:
             return self._restored_native_value()
+        # HA raises ValueError on write for a timestamp sensor that is not an
+        # aware datetime, or a numeric sensor with a non-numeric value.
+        if self._is_timestamp:
+            return _to_utc_datetime(val)
 
         if isinstance(val, str):
             return self._process_string_value(val)
-        if isinstance(val, int | float) and not isinstance(val, bool):
+        if isinstance(val, bool):
+            return None if self._is_numeric else val
+        if isinstance(val, int | float):
+            if not math.isfinite(val):
+                return None
             return self._apply_numeric_transform(float(val))
+        if self._is_numeric:
+            return None
         if isinstance(val, dict | list):
             return json.dumps(val, sort_keys=True, separators=(",", ":"))
 
         return val
 
-    def _restored_native_value(self) -> str | float | int | None:
+    def _restored_native_value(self) -> str | float | int | datetime | None:
         restored = self.restored_state
         if restored is None:
             return None
-        desc = self.entity_description
-        if (
-            desc.native_unit_of_measurement is not None
-            or desc.state_class is not None
-            or desc.suggested_display_precision is not None
-        ):
-            converted = self._convert_to_numeric(restored)
-            if converted is not None:
-                return converted
+        if self._is_timestamp:
+            return _to_utc_datetime(restored)
+        if self._is_numeric:
+            return self._convert_to_numeric(restored)
         return restored
 
     def _process_string_value(self, val: str) -> str | float | None:
-        """Process string values, converting to numeric if unit is present."""
+        """Process string values, converting to numeric for numeric sensors."""
         val = val.strip().strip('"').strip("'")
         desc = self.entity_description
         if desc.strip_prefix and val.startswith(desc.strip_prefix):
             val = val[len(desc.strip_prefix) :]
-        if desc.native_unit_of_measurement is not None:
+        if self._is_numeric:
             return self._convert_to_numeric(val)
         return val
 
@@ -248,6 +300,8 @@ class TelemetrySensor(TelemetryEntity, SensorEntity):
         try:
             num = float(val)
         except (TypeError, ValueError):
+            return None
+        if not math.isfinite(num):
             return None
         return self._apply_numeric_transform(num)
 

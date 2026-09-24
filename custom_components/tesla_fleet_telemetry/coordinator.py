@@ -33,6 +33,7 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._field_events: dict[str, asyncio.Event] = {}
         self._last_alert_timestamp: str | None = None
         self._notify_handle: asyncio.TimerHandle | None = None
+        self._unknown_fields_logged: set[str] = set()
         # Seed data so coordinator is not None before first MQTT message
         self.data = {}
 
@@ -44,7 +45,9 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def async_update_field(self, field: str, value: Any) -> None:
         """Update a telemetry field, notify listeners, and signal waiters."""
         if field not in FIELD_DEFS:
-            _LOGGER.warning("Unknown field updated: %s, ignoring", field)
+            if field not in self._unknown_fields_logged:
+                self._unknown_fields_logged.add(field)
+                _LOGGER.warning("Unknown field updated: %s, ignoring", field)
             return
         if self.data.get(field) == value:
             return
@@ -69,6 +72,20 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_update_success = True
         self.async_update_listeners()
 
+    @callback
+    def async_update_listeners(self) -> None:
+        """Update all listeners, isolating failures to the entity that raised.
+
+        The base implementation stops at the first listener that raises, so one
+        entity rejecting a telemetry value (e.g. HA's sensor state validation)
+        would silently freeze every entity registered after it.
+        """
+        for update_callback, _ in list(self._listeners.values()):
+            try:
+                update_callback()
+            except Exception:
+                _LOGGER.exception("Error updating entity for %s", self.vin)
+
     async def async_shutdown(self) -> None:
         """Cancel delayed listener updates during entry unload."""
         if self._notify_handle is not None:
@@ -82,7 +99,7 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 listener(field, value)
             except Exception as e:
-                _LOGGER.error("Error in field listener for field %s: %s", field, e)
+                _LOGGER.exception("Error in field listener for field %s: %s", field, e)
 
     @callback
     def async_add_field_listener(
@@ -140,6 +157,7 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         started_at = alert_data.get("StartedAt")
         if not started_at:
             return
+        started_at = str(started_at)
         if self._last_alert_timestamp is None or started_at > self._last_alert_timestamp:
             self._last_alert_timestamp = started_at
             values = dict(self.data)

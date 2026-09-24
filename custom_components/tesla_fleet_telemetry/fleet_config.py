@@ -710,7 +710,9 @@ def _build_push_result(
                 "key_paired": None,
                 "attempts": 0,
                 "wait_seconds": 0,
-                "sync_pending": not pushed or synced is None,
+                # Only a push Tesla accepted can be pending sync; a failed or
+                # rate-limited push must not start the sync-polling loop.
+                "sync_pending": pushed and synced is None,
             }
         )
     result.update(

@@ -13,6 +13,7 @@ from homeassistant.components.media_player.const import MediaPlayerState, MediaT
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .command_entity import CommandEntity
 from .const import MEDIA_PLAYER_VOLUME_INCREMENT, MEDIA_PLAYER_VOLUME_MAX
@@ -148,7 +149,7 @@ class TeslaMediaPlayer(CommandEntity, MediaPlayerEntity):
     def media_position_updated_at(self) -> datetime | None:
         if self.media_position is None:
             return None
-        return datetime.now()
+        return dt_util.utcnow()
 
     @property
     def volume_level(self) -> float | None:

@@ -830,11 +830,9 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                 "auth_implementation": auth_implementation,
                 "token": token,
             }
-            # async_update_and_abort (not async_update_reload_and_abort): this entry
-            # has an update listener that already reloads on data changes, so calling
-            # the reload-scheduling variant here would trigger a double reload/race
-            # (HA deprecated that combination, breaking in 2026.12).
-            return self.async_update_and_abort(
+            # The entry has no update listener (routine token refreshes must not
+            # reload it), so reauth schedules its own reload here.
+            return self.async_update_reload_and_abort(
                 self.reauth_entry,
                 data_updates=merged_data,
             )
@@ -1013,7 +1011,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
         )
 
 
-class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlow):
+class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
     """Allow reconfiguring connection and data rate settings without re-adding."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
