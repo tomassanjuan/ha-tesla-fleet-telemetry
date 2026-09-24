@@ -30,42 +30,57 @@ OnMessageCallback = Callable[[str, Any], None]
 OnAlertCallback = Callable[[str, dict[str, Any]], None]
 
 
-def _parse_value(raw: str) -> Any:
-    """Convert raw MQTT payload string to a typed Python value.
+_NONE_STRINGS = frozenset({"", "Unknown", "None", "none", "null"})
 
-    Rules:
-    - "true" / "false" → bool
-    - "" / "Unknown" / "None" / "none" → None
-    - JSON object string → dict (for Location)
-    - Numeric string → float (or int if whole number)
-    - Anything else → str (enum values, state names)
+
+def _normalize_number(value: float) -> int | float | None:
+    if not math.isfinite(value):
+        return None
+    # Whole numbers become int so e.g. 80.0 and 80 compare/display the same.
+    return int(value) if value.is_integer() else value
+
+
+def _parse_value(raw: str) -> Any:
+    """Convert a raw MQTT payload to a typed Python value.
+
+    fleet-telemetry publishes every value with json.Marshal, so payloads are
+    decoded as JSON first: numbers stay numbers, strings stay strings (a
+    numeric-looking string such as a vehicle name is not coerced, and \\u
+    escapes are decoded), objects become dicts and `null` (Tesla's "invalid")
+    becomes None. Non-JSON payloads fall back to the legacy heuristics.
 
     Returns:
-        Typed value: bool, int, float, str, dict, or None depending on input.
+        Typed value: bool, int, float, str, dict, list, or None.
     """
-    # Many enum/string values arrive wrapped in double quotes.
-    if len(raw) >= 2 and raw[0] == '"' and raw[-1] == '"':
-        raw = raw[1:-1].strip()
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return _parse_non_json_value(raw)
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return _normalize_number(value)
+    if isinstance(value, str):
+        value = value.strip()
+        return None if value in _NONE_STRINGS else value
+    return value
 
-    if raw in ("", "Unknown", "None", "none", "null"):
+
+def _parse_non_json_value(raw: str) -> Any:
+    """Best-effort parse for payloads that are not valid JSON."""
+    if raw in _NONE_STRINGS:
         return None
     if raw.lower() == "true":
         return True
     if raw.lower() == "false":
         return False
-    if raw.startswith("{"):
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return raw
     try:
         val = float(raw)
     except ValueError:
         return raw
-    if not math.isfinite(val):
-        return None
-    # Return int if it's a whole number, else float
-    return int(val) if val.is_integer() else val
+    return _normalize_number(val)
 
 
 def _format_mqtt_error(vin: str, topic: str, value: Any, retained: bool) -> str:

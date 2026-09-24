@@ -58,3 +58,24 @@ credential, TLS and client-id wiring.
 | 29 | **CI red on `main` since before this audit.** Tests failed with "Lingering timer" (newer HA test harness), and mypy couldn't parse HA's Python 3.14 syntax. | Test fixtures cancel the coordinator's debounce timer (new `async_cancel_pending_update()`). mypy `python_version` is now 3.14, matching CI. |
 
 No findings from this audit remain open.
+
+## Wire-format pass (checked against fleet-telemetry's MQTT dispatcher)
+
+Every decoder was re-checked against `fleet-telemetry/datastore/mqtt/mqtt_payload.go`
+(`getDatumValue`/`getProtoValue`) and `protos/vehicle_data.proto`, the code that
+actually produces the MQTT payloads this integration reads.
+
+| # | Finding | Resolution |
+|---|---------|-----------|
+| 30 | **Window binary sensors never had a state.** `FdWindow`…`RpWindow` arrive as `WindowState` enum names (`"WindowStatePartiallyOpen"`), and the binary sensor returned `None` for any string. | Enum-name decoding: Closed → off, PartiallyOpen/Opened → on, Unknown → unknown. |
+| 31 | **Driver seat-belt binary sensor never had a state.** The value is a `BuckleStatus` enum name. | Latched → on, Unlatched → off, Faulted/Unknown → unknown. |
+| 32 | **TPMS warning sensors never had a state.** `TpmsHardWarnings`/`TpmsSoftWarnings` are a TireLocation object listing only the flagged tyres (`{}` or `{"front_left": true}`), and dicts decoded to `None`. | Aggregate = any flagged tyre. |
+| 33 | **The per-tyre TPMS fields aren't Tesla fields.** `TpmsHardWarningFl`… are not in the proto, so enabling one put an unknown field in the push and Tesla rejected the whole config. The mapping that should have tied them to the real field was keyed on a suffix no entity uses. | Per-tyre values are derived in the coordinator from the aggregate object. They're excluded from the push and mapped to the aggregate field for enablement. |
+| 34 | **Partially open window read as closed** by the windows cover. | `PartiallyOpen` counts as open. |
+| 35 | **`HvilStatusUnknown` reported as a fault.** | Unknown is now unknown; only `Fault` is on. |
+| 36 | **Charge-port latch decoding used substring checks.** "engaged" matches "disengaged". It's currently unused (the field is a sensor), but was wrong. | Exact matches. |
+| 37 | **Payload parser coerced strings.** Every value is `json.Marshal`ed, but the parser stripped quotes and tried `float()`: a numeric-looking string became a number, and `\u` escapes were left raw. | JSON-first decoding, with the old heuristics kept only for non-JSON payloads. |
+| 38 | **Invalid values showed stale restored state.** `null` (Tesla's "invalid") wasn't stored, so an entity kept showing its pre-restart value indefinitely. | The coordinator stores explicit `None`. Restored state is used only until the field has been received at all. |
+| 39 | **The unknown-field repair undid itself.** It disabled entities with `disabled_by=INTEGRATION`, which the next setup's default-enabled sync re-enables, and which the fleet-config resync listener ignores. | It now disables as `USER`, which is what it is: a user-confirmed fix. |
+
+Tests: `tests/test_value_decoding.py` (25 cases); 15 of them fail on the previous code.

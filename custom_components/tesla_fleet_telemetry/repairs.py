@@ -176,10 +176,14 @@ class UnknownFieldRepairFlow(RepairsFlow):
         for entity_entry in er.async_entries_for_config_entry(registry, entry_id):
             if field not in _fields_for_unique_id(entity_entry.unique_id, vin):
                 continue
-            if entity_entry.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
+            if entity_entry.disabled_by is not None:
                 continue
+            # Disabled as USER (the user confirmed this fix): an INTEGRATION
+            # disable is undone at the next setup by the default-enabled sync
+            # for default-on entities, and is ignored by the fleet-config
+            # resync listener, so the unknown field would stay in the push.
             registry.async_update_entity(
-                entity_entry.entity_id, disabled_by=er.RegistryEntryDisabler.INTEGRATION
+                entity_entry.entity_id, disabled_by=er.RegistryEntryDisabler.USER
             )
             disabled += 1
 

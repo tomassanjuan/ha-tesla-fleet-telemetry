@@ -28,12 +28,23 @@ from .coordinator import TelemetryCoordinator
 from .device import build_device_info
 from .entity_base import TelemetryEntity, telemetry_unique_id
 from .fleet_config import PolicyState
-from .utils import door_state_tokens
+from .utils import coerce_bool, door_state_tokens
 
 ASYNC_DISPATCHER_CONNECT = cast(
     Callable[[HomeAssistant, str, Callable[[dict[str, Any]], None]], Callable[[], None]],
     async_dispatcher_connect,
 )
+
+# Enum-valued binary fields: fleet-telemetry publishes the enum name
+# (e.g. "WindowStatePartiallyOpen"); map the suffix after the prefix to on/off.
+# Unknown/SNA/Faulted suffixes are deliberately absent -> state unknown.
+_ENUM_BINARY_STATES: dict[str, tuple[str, dict[str, bool]]] = {
+    "FdWindow": ("WindowState", {"Closed": False, "PartiallyOpen": True, "Opened": True}),
+    "FpWindow": ("WindowState", {"Closed": False, "PartiallyOpen": True, "Opened": True}),
+    "RdWindow": ("WindowState", {"Closed": False, "PartiallyOpen": True, "Opened": True}),
+    "RpWindow": ("WindowState", {"Closed": False, "PartiallyOpen": True, "Opened": True}),
+    "DriverSeatBelt": ("BuckleStatus", {"Latched": True, "Unlatched": False}),
+}
 
 _DOOR_SENSORS = (
     ("Door Front Left", "door_front_left", ("df", "fd", "front_left", "driver_front")),
@@ -99,12 +110,23 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
             return self._is_on_charge_port_latch(val)
         if key == "DriveRail" and isinstance(val, str):
             return "Dual" in val
+        if key in _ENUM_BINARY_STATES and isinstance(val, str):
+            prefix, states = _ENUM_BINARY_STATES[key]
+            return states.get(val.removeprefix(prefix))
+        return self._is_on_generic(val)
 
+    @staticmethod
+    def _is_on_generic(val: Any) -> bool | None:
+        """Decode a plain bool/number/object/string telemetry value."""
         if isinstance(val, bool):
             return val
         if isinstance(val, int | float):
             return bool(val)
-        return None
+        if isinstance(val, dict):
+            # TireLocation (TpmsHardWarnings/TpmsSoftWarnings) lists only the
+            # tyres whose flag is set, e.g. {"front_left": true}; {} = none.
+            return any(bool(flag) for flag in val.values())
+        return coerce_bool(val)
 
     def _is_on_hvil(self, val: Any) -> bool | None:
         """Parse HVIL status."""
@@ -116,12 +138,13 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
                     break
             if lowered == "ok":
                 return False
-            if lowered in {"fault", "unknown"}:
+            if lowered == "fault":
                 return True
         if isinstance(val, int | float):
+            # HvilStatus enum: 0 Unknown, 1 Fault, 2 OK. Unknown is not a fault.
             if int(val) == 2:
                 return False
-            if int(val) in {0, 1}:
+            if int(val) == 1:
                 return True
         return None
 
@@ -134,9 +157,11 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
             if lowered.startswith(prefix):
                 lowered = lowered[len(prefix) :].strip()
                 break
-        if any(token in lowered for token in ("engaged", "latched", "closed", "locked")):
+        # Exact matches: "engaged" is a substring of "disengaged" (and
+        # "latched" of "unlatched"), so substring checks misread the negatives.
+        if lowered in {"engaged", "latched", "closed", "locked"}:
             return True
-        if any(token in lowered for token in ("disengaged", "unlatched", "open", "unlocked")):
+        if lowered in {"disengaged", "unlatched", "open", "unlocked"}:
             return False
         return None
 
@@ -165,9 +190,14 @@ class _DoorBinarySensorBase(
     def available(self) -> bool:
         if not self.coordinator.last_update_success:
             return False
-        return (
-            self.coordinator.get_field("DoorState") is not None or self._restored_is_on is not None
-        )
+        if self.coordinator.get_field("DoorState") is not None:
+            return True
+        return "DoorState" not in self.coordinator.data and self._restored_is_on is not None
+
+    @property
+    def _restored_door_state(self) -> bool | None:
+        """Restored value, only until DoorState has been received (even as invalid)."""
+        return None if "DoorState" in self.coordinator.data else self._restored_is_on
 
 
 class TeslaDoorStateBinarySensor(_DoorBinarySensorBase):
@@ -200,7 +230,7 @@ class TeslaDoorStateBinarySensor(_DoorBinarySensorBase):
     def is_on(self) -> bool | None:
         door_state = self.coordinator.get_field("DoorState")
         if door_state is None:
-            return self._restored_is_on
+            return self._restored_door_state
         tokens = door_state_tokens(door_state)
         return any(token in tokens for token in self._token_keys)
 
@@ -227,7 +257,7 @@ class TeslaAnyDoorOpenBinarySensor(_DoorBinarySensorBase):
     def is_on(self) -> bool | None:
         door_state = self.coordinator.get_field("DoorState")
         if door_state is None:
-            return self._restored_is_on
+            return self._restored_door_state
         tokens = door_state_tokens(door_state)
         return bool(tokens)
 
