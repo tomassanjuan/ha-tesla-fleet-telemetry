@@ -63,6 +63,7 @@ from .fleet_config import (
 from .mqtt_client import TeslaMQTTClient
 from .oauth2 import (
     TeslaOAuth2Implementation,
+    async_drop_oauth_session,
     async_get_valid_access_token,
 )
 from .proxy_client import TeslaProxyClient
@@ -550,7 +551,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
         raise
 
     # --- Teardown ---
-    entry.async_on_unload(entry.add_update_listener(_options_update_listener))
+    # No update listener: OAuth token refreshes write entry.data every few hours,
+    # and reloading on that tore down the proxy session under in-flight commands.
+    # Options changes reload via OptionsFlowWithReload; reauth via
+    # async_update_reload_and_abort.
     entry.async_on_unload(_register_entity_registry_sync_listener(hass, entry))
     entry.async_on_unload(coordinator.async_shutdown)
     entry.async_on_unload(_cancel_bootstrap)
@@ -670,24 +674,9 @@ def _should_attempt_wake(
     return any(marker in normalized for marker in ("disconnected", "offline", "asleep"))
 
 
-async def _options_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload the integration when its data or options change.
-
-    Note: this also fires (and reloads) on routine OAuth token refreshes, since
-    OAuth2Session.async_ensure_token_valid() writes the refreshed token into
-    entry.data — not just on real reconfiguration/reauth. An earlier attempt to
-    filter that out by excluding the token from the change comparison was
-    reverted: it can't reliably distinguish a routine refresh from a reauth with
-    otherwise-unchanged connection settings, and HA's own guidance is that a
-    reauth should always reload (see "Always reload after a successful re-auth
-    flow", developers.home-assistant.io, 2024-04-25) — silently swallowing that
-    would be a worse bug than the extra reload. Left as a known inefficiency;
-    revisit only with a way to distinguish the two triggers by origin, not by
-    data diff.
-    """
-    await hass.config_entries.async_reload(entry.entry_id)
-
-
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload the integration."""
-    return bool(await hass.config_entries.async_unload_platforms(entry, PLATFORMS))
+    unloaded = bool(await hass.config_entries.async_unload_platforms(entry, PLATFORMS))
+    if unloaded:
+        async_drop_oauth_session(hass, entry)
+    return unloaded

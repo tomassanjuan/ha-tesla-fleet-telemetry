@@ -56,7 +56,12 @@ class ChargeLimitNumber(CommandEntity, NumberEntity):
     @property
     def native_value(self) -> float | None:
         val = self.coordinator.get_field("ChargeLimitSoc")
-        return float(val) if val is not None else None
+        if isinstance(val, bool) or not isinstance(val, int | float | str):
+            return None
+        try:
+            return float(val)
+        except ValueError:
+            return None
 
     async def async_set_native_value(self, value: float) -> None:
         await self._send_command("set_charge_limit", {"percent": int(value)})
@@ -87,6 +92,7 @@ class ChargeAmpsNumber(CommandEntity, NumberEntity):
         self._pending_max_update: asyncio.TimerHandle | None = None
 
     async def async_will_remove_from_hass(self) -> None:
+        await super().async_will_remove_from_hass()
         if self._pending_max_update is not None:
             self._pending_max_update.cancel()
             self._pending_max_update = None

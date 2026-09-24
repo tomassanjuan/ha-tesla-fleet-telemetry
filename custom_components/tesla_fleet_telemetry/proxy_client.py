@@ -344,7 +344,7 @@ class TeslaProxyClient:
                     raise HomeAssistantError("Missing lat/lon in navigation_gps_request")
                 return cast(
                     dict[str, Any],
-                    await v.navigation_gps_request(lat, lon, body.get("order")),
+                    await v.navigation_gps_request(lat, lon, int(body.get("order") or 0)),
                 )
             case "remote_boombox":
                 sound = body.get("sound", body.get("sound_id", 0))

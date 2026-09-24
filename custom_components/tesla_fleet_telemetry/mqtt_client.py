@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 from collections.abc import Callable
 from typing import Any
@@ -58,10 +59,12 @@ def _parse_value(raw: str) -> Any:
             return raw
     try:
         val = float(raw)
-        # Return int if it's a whole number, else float
-        return int(val) if val == int(val) else val
     except ValueError:
         return raw
+    if not math.isfinite(val):
+        return None
+    # Return int if it's a whole number, else float
+    return int(val) if val.is_integer() else val
 
 
 def _format_mqtt_error(vin: str, topic: str, value: Any, retained: bool) -> str:
@@ -132,6 +135,9 @@ class TeslaMQTTClient:
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_mqtt_message
+        # paho re-raises callback exceptions by default, which kills its network
+        # thread: telemetry stops with no disconnect event and no reconnect.
+        client.suppress_exceptions = True
         return client
 
     def _on_connect(self, client, userdata, flags, reason_code, properties) -> None:
@@ -154,7 +160,16 @@ class TeslaMQTTClient:
             )
             self._schedule_reconnect()
 
-    def _on_mqtt_message(self, client, userdata, msg) -> None:  # noqa: C901
+    def _on_mqtt_message(self, client, userdata, msg) -> None:
+        try:
+            self._handle_mqtt_message(msg)
+        except RuntimeError as err:
+            # call_soon_threadsafe on a closed loop during shutdown.
+            _LOGGER.debug("Dropping MQTT message on %s: %s", msg.topic, err)
+        except Exception:
+            _LOGGER.exception("Error handling Tesla MQTT message on %s", msg.topic)
+
+    def _handle_mqtt_message(self, msg) -> None:  # noqa: C901
         topic: str = msg.topic
         raw = msg.payload.decode("utf-8", errors="replace").strip()
         value = _parse_value(raw)
@@ -294,10 +309,11 @@ class TeslaMQTTClient:
             finally:
                 self._reconnect_task = None
         if self._client:
+            client, self._client = self._client, None
             try:
-                self._client.disconnect()
-                self._client.loop_stop()
+                client.disconnect()
+                # loop_stop() joins paho's network thread; keep it off the event loop.
+                await self._hass.async_add_executor_job(client.loop_stop)
             except Exception as e:  # noqa: S110
                 _LOGGER.debug("Error disconnecting MQTT client: %s", e)
-            self._client = None
         _LOGGER.info("Tesla MQTT client disconnected")

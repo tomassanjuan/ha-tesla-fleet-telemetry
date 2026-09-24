@@ -16,6 +16,7 @@ from tesla_fleet_api.exceptions import Forbidden, InvalidRequest, TeslaFleetErro
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 
 from .const import (
+    DOMAIN,
     FLEET_API_BASE,
     FLEET_API_VERSION,
     OAUTH_AUTHORIZE_URL,
@@ -26,6 +27,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 CONF_TOKEN = "token"
+_OAUTH_SESSIONS_KEY = f"{DOMAIN}_oauth_sessions"
 
 # Scopes used for partner (client_credentials) token requests.
 _PARTNER_SCOPES: list[Scope] = [
@@ -102,6 +104,37 @@ def token_from_entry_data(entry_data: Mapping[str, Any]) -> dict[str, Any] | Non
     return None
 
 
+def _get_oauth_session(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    implementation: config_entry_oauth2_flow.AbstractOAuth2Implementation,
+) -> config_entry_oauth2_flow.OAuth2Session:
+    """Return one shared OAuth2Session per config entry.
+
+    OAuth2Session serializes refreshes with a per-instance lock. Creating a new
+    session per call let concurrent callers (e.g. two commands, or a command and
+    a telemetry config push) refresh the same single-use Tesla refresh token in
+    parallel; the loser got a 401 and forced a spurious reauth.
+    """
+    sessions: dict[str, config_entry_oauth2_flow.OAuth2Session] = hass.data.setdefault(
+        _OAUTH_SESSIONS_KEY, {}
+    )
+    session = sessions.get(entry.entry_id)
+    if (
+        session is None
+        or session.config_entry is not entry
+        or session.implementation is not implementation
+    ):
+        session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
+        sessions[entry.entry_id] = session
+    return session
+
+
+def async_drop_oauth_session(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Forget the cached OAuth2Session for an unloaded entry."""
+    hass.data.get(_OAUTH_SESSIONS_KEY, {}).pop(entry.entry_id, None)
+
+
 async def async_get_valid_access_token(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -112,7 +145,7 @@ async def async_get_valid_access_token(
     if token is None:
         raise ConfigEntryAuthFailed("No OAuth token found in config entry")
 
-    session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
+    session = _get_oauth_session(hass, entry, implementation)
 
     try:
         await session.async_ensure_token_valid()
