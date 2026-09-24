@@ -38,11 +38,16 @@
           "proxy_url": "Tesla HTTP Proxy",
           "telemetry_server_endpoint": "Telemetry Server",
           "telemetry_mode": "Telemetry Mode",
-          "domain": "Application Domain"
+          "domain": "Application Domain",
+          "mqtt_username": "MQTT Username",
+          "mqtt_password": "MQTT Password",
+          "mqtt_tls": "Use TLS for MQTT"
         },
         "data_description": {
           "domain": "Your app's root domain from developer.tesla.com allowed_origins. Used for partner account registration and the virtual key pairing URL.",
-          "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla)."
+          "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla).",
+          "mqtt_username": "Leave empty if your broker allows anonymous connections.",
+          "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store."
         }
       }
     },
@@ -95,11 +100,16 @@
           "proxy_url": "Tesla HTTP Proxy",
           "telemetry_server_endpoint": "Telemetry Server",
           "telemetry_mode": "Telemetry Mode",
-          "domain": "Application Domain"
+          "domain": "Application Domain",
+          "mqtt_username": "MQTT Username",
+          "mqtt_password": "MQTT Password",
+          "mqtt_tls": "Use TLS for MQTT"
         },
         "data_description": {
           "domain": "Your app's root domain from developer.tesla.com (e.g. yourdomain.com). Used for partner account registration and virtual key pairing.",
-          "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla)."
+          "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla).",
+          "mqtt_username": "Leave empty if your broker allows anonymous connections.",
+          "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store."
         }
       }
     },

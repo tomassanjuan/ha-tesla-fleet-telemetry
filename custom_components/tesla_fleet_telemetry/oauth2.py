@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import config_entry_oauth2_flow
 from tesla_fleet_api.const import Method, Scope
-from tesla_fleet_api.exceptions import Forbidden, InvalidRequest, TeslaFleetError
+from tesla_fleet_api.exceptions import Forbidden, InvalidRequest, LibraryError, TeslaFleetError
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 
 from .const import (
@@ -252,8 +252,13 @@ async def async_check_partner_public_key(
             raise HomeAssistantError(f"Partner public key check failed: {err}") from err
 
 
-async def async_fetch_available_vins(access_token: str) -> list[str]:
-    """Fetch available VINs for the authenticated account from Fleet API."""
+async def async_fetch_available_vins(access_token: str) -> tuple[list[str], str]:
+    """Fetch available VINs for the account and the account's regional Fleet API base URL.
+
+    Tesla serves each account from one regional Fleet API host (NA, EU or CN) and
+    answers other regions with an out-of-region error, so the region is looked up
+    from /users/region before listing vehicles.
+    """
     async with aiohttp.ClientSession() as session:
         api = TeslaFleetApi(
             session=session,
@@ -262,13 +267,19 @@ async def async_fetch_available_vins(access_token: str) -> list[str]:
             charging_scope=False,
             energy_scope=False,
             partner_scope=False,
-            user_scope=False,
+            user_scope=True,
             vehicle_scope=False,
         )
         try:
+            try:
+                await api.find_server()
+            except LibraryError:
+                # No region answered for this account; fall back to the default host.
+                api.server = FLEET_API_BASE
             payload = await api._request(Method.GET, f"{FLEET_API_VERSION}/vehicles")
         except TeslaFleetError as err:
             raise HomeAssistantError(f"VIN fetch failed: {err}") from err
+        api_base = str(api.server or FLEET_API_BASE).rstrip("/")
 
     vins: list[str] = []
     response = payload.get("response", payload)
@@ -280,4 +291,4 @@ async def async_fetch_available_vins(access_token: str) -> list[str]:
             if isinstance(vin, str) and vin.strip():
                 vins.append(vin.strip().upper())
 
-    return list(dict.fromkeys(vins))
+    return list(dict.fromkeys(vins)), api_base

@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 import re
+import socket
 import ssl
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
+# Seconds allowed for the TCP+TLS handshake when fetching a server certificate.
+_CERT_FETCH_TIMEOUT_SECONDS = 3
 
 # Lowercase prefixes stripped before bool evaluation (Tesla HVAC enum prefixes).
 _COERCE_BOOL_PREFIXES: tuple[str, ...] = (
@@ -196,3 +203,43 @@ def extract_first_fields_config(payload: Any) -> dict[str, Any] | None:
             if extracted is not None:
                 return extracted
     return None
+
+
+def _fetch_server_ca_blocking(hostname: str, port: int) -> tuple[str, bool]:
+    """Return (ca_pem_bundle, trusted) for a TLS server; blocking, run in an executor.
+
+    For a publicly trusted certificate the whole verified chain (leaf through
+    root) is returned, so vehicles keep trusting the server after the leaf is
+    renewed under the same CA. Otherwise only the leaf is returned with
+    trusted=False and the caller decides whether to accept it.
+    """
+    try:
+        verify_ctx = ssl.create_default_context()
+        with (
+            socket.create_connection((hostname, port), timeout=_CERT_FETCH_TIMEOUT_SECONDS) as sock,
+            verify_ctx.wrap_socket(sock, server_hostname=hostname) as ssock,
+        ):
+            chain = ssock.get_verified_chain()
+        if chain:
+            return der_cert_chain_to_pem_bundle(list(chain)), True
+    except (OSError, ValueError):
+        # Untrusted or hostname mismatch (SSLCertVerificationError is an OSError);
+        # fall through to fetch the leaf without verification.
+        pass
+
+    unverified_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    unverified_ctx.check_hostname = False
+    unverified_ctx.verify_mode = ssl.CERT_NONE
+    with (
+        socket.create_connection((hostname, port), timeout=_CERT_FETCH_TIMEOUT_SECONDS) as sock,
+        unverified_ctx.wrap_socket(sock, server_hostname=hostname) as ssock,
+    ):
+        leaf_der = ssock.getpeercert(binary_form=True)
+    if not leaf_der:
+        raise ConnectionError("Server did not provide a certificate")
+    return der_cert_chain_to_pem_bundle([leaf_der]), False
+
+
+async def async_fetch_server_ca(hass: HomeAssistant, hostname: str, port: int) -> tuple[str, bool]:
+    """Fetch a server's CA bundle in the executor; see _fetch_server_ca_blocking."""
+    return await hass.async_add_executor_job(_fetch_server_ca_blocking, hostname, port)

@@ -17,20 +17,26 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     HomeAssistantError,
 )
-from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers import config_entry_oauth2_flow, instance_id
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.util.ssl import client_context
 
 from .const import (
     BOOTSTRAP_PUSH_RETRY_DELAY_SECONDS,
     CONF_CONNECTION_TIMEOUT,
     CONF_DOMAIN,
     CONF_MQTT_HOST,
+    CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
+    CONF_MQTT_TLS,
     CONF_MQTT_TOPIC_BASE,
+    CONF_MQTT_USERNAME,
     CONF_PROXY_URL,
     CONF_TELEMETRY_MODE,
+    CONF_TELEMETRY_SERVER_CA,
     CONF_TELEMETRY_SERVER_HOSTNAME,
+    CONF_TELEMETRY_SERVER_PORT,
     CONF_VIN,
     DEFAULT_CONNECTION_TIMEOUT,
     DEFAULT_MQTT_TOPIC_BASE,
@@ -67,6 +73,7 @@ from .oauth2 import (
     async_get_valid_access_token,
 )
 from .proxy_client import TeslaProxyClient
+from .utils import async_fetch_server_ca, normalize_pem_cert_bundle
 
 _LOGGER = logging.getLogger(__name__)
 ASYNC_DISPATCHER_SEND = cast(Callable[[HomeAssistant, str, Any], None], async_dispatcher_send)
@@ -201,6 +208,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
     topic_base = _opts.get(CONF_MQTT_TOPIC_BASE, entry_data.get(CONF_MQTT_TOPIC_BASE)) or (
         DEFAULT_MQTT_TOPIC_BASE
     )
+    # Suffix the client id with this HA instance's id: brokers disconnect the
+    # older of two sessions sharing an id, so a second HA instance (e.g. a dev
+    # box) on the same broker would otherwise knock this one off in a loop.
+    hass_instance_id = await instance_id.async_get(hass)
     mqtt_client = TeslaMQTTClient(
         hass,
         host=mqtt_host,
@@ -210,6 +221,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
         on_alert=_on_alert,
         timeout_seconds=connection_timeout,
         topic_base=topic_base,
+        username=_opts.get(CONF_MQTT_USERNAME) or None,
+        password=_opts.get(CONF_MQTT_PASSWORD) or None,
+        ssl_context=client_context() if _opts.get(CONF_MQTT_TLS) else None,
+        client_id=f"{DOMAIN}_{vin}_{hass_instance_id[:8]}",
     )
 
     try:
@@ -311,7 +326,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
             if task is not None:
                 pending_sync_tasks.discard(task)
 
-    async def _push_entry_telemetry_config(reason: str = "manual") -> dict[str, Any]:  # noqa: C901
+    async def _push_entry_telemetry_config(  # noqa: C901
+        reason: str = "manual", *, force: bool = False
+    ) -> dict[str, Any]:
         loop = asyncio.get_running_loop()
         now = loop.time()
 
@@ -347,14 +364,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
             )
             return _skip_result(f"rate_limited_for_{remaining}s")
 
-        # Universal minimum interval — prevent rapid-fire pushes regardless of reason
+        # Universal minimum interval — prevent rapid-fire pushes for every reason,
+        # including manual button presses. `force` is only for callers that just
+        # deleted the config and must not leave the vehicle without one.
         last_push_monotonic = policy_state.last_push_monotonic
         if (
-            isinstance(last_push_monotonic, int | float)
+            not force
+            and isinstance(last_push_monotonic, int | float)
             and now - last_push_monotonic < MIN_UNIVERSAL_PUSH_INTERVAL_SECONDS
         ):
-            if reason != "manual":
-                return _skip_result("throttled")
+            remaining = int(MIN_UNIVERSAL_PUSH_INTERVAL_SECONDS - (now - last_push_monotonic)) + 1
+            return _skip_result(f"throttled, retry in {remaining}s")
 
         # Automatic-push extended minimum
         if (
@@ -370,9 +390,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
             now_inner = loop.time()
             last_push_inner = policy_state.last_push_monotonic
             if (
-                isinstance(last_push_inner, int | float)
+                not force
+                and isinstance(last_push_inner, int | float)
                 and now_inner - last_push_inner < MIN_UNIVERSAL_PUSH_INTERVAL_SECONDS
-                and reason != "manual"
             ):
                 return _skip_result("throttled")
             if (
@@ -476,7 +496,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
 
     async def _reload_entry_telemetry_data() -> dict[str, Any]:
         await _delete_entry_telemetry_config()
-        await _push_entry_telemetry_config(reason="manual")
+        await _push_entry_telemetry_config(reason="manual", force=True)
         return await _get_entry_telemetry_config()
 
     async def _delete_entry_telemetry_config() -> dict[str, Any]:
@@ -502,6 +522,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
             policy_state.logged_telemetry_error_keys,
             hass,
         )
+
+    async def _refresh_telemetry_ca() -> None:
+        """Replace the stored telemetry CA when the server's trusted chain changed.
+
+        Entries created before the full chain was stored pinned only the leaf
+        certificate, which vehicles stop trusting when it renews. Runs before the
+        startup push so that push carries the current chain.
+        """
+        hostname = _opts.get(CONF_TELEMETRY_SERVER_HOSTNAME)
+        port = _opts.get(CONF_TELEMETRY_SERVER_PORT)
+        if not hostname or not isinstance(port, int):
+            return
+        try:
+            pem, trusted = await async_fetch_server_ca(hass, hostname, port)
+        except (OSError, ValueError) as err:
+            _LOGGER.debug("Telemetry server CA check failed for %s:%s: %s", hostname, port, err)
+            return
+        if not trusted:
+            return
+        try:
+            current = normalize_pem_cert_bundle(_opts.get(CONF_TELEMETRY_SERVER_CA, ""))
+        except ValueError:
+            current = ""
+        if pem == current:
+            return
+        _LOGGER.info(
+            "Telemetry server certificate chain for %s:%s changed; updating stored CA",
+            hostname,
+            port,
+        )
+        _opts[CONF_TELEMETRY_SERVER_CA] = pem
+        if CONF_TELEMETRY_SERVER_CA in entry.options:
+            hass.config_entries.async_update_entry(
+                entry, options={**entry.options, CONF_TELEMETRY_SERVER_CA: pem}
+            )
+        else:
+            hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_TELEMETRY_SERVER_CA: pem}
+            )
 
     async def _wake_entry_vehicle() -> None:
         access_token, _ = await async_get_valid_access_token(hass, entry, implementation)
@@ -554,6 +613,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
                 push_entry_telemetry_config=_push_entry_telemetry_config,
                 get_entry_telemetry_config=_get_entry_telemetry_config,
                 wake_entry_vehicle=_wake_entry_vehicle,
+                refresh_telemetry_ca=_refresh_telemetry_ca,
             )
         )
     except Exception:
@@ -586,10 +646,13 @@ async def _async_run_setup_bootstrap(
     push_entry_telemetry_config,
     get_entry_telemetry_config,
     wake_entry_vehicle,
+    refresh_telemetry_ca,
 ) -> None:
     """Finish slow post-setup work without blocking config entry load."""
     try:
         _LOGGER.debug("Starting background setup bootstrap for %s", vin)
+
+        await refresh_telemetry_ca()
 
         push_result = await push_entry_telemetry_config(reason="setup")
         # Entity registry entries can still be settling when this first push fires,

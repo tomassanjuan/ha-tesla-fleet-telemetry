@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import math
+import ssl
 import time
 from collections.abc import Callable
 from typing import Any
@@ -102,8 +103,16 @@ class TeslaMQTTClient:
         on_alert: OnAlertCallback | None = None,
         timeout_seconds: int = DEFAULT_CONNECTION_TIMEOUT,
         topic_base: str = DEFAULT_MQTT_TOPIC_BASE,
+        username: str | None = None,
+        password: str | None = None,
+        ssl_context: ssl.SSLContext | None = None,
+        client_id: str | None = None,
     ) -> None:
         self._hass = hass
+        self._username = username or None
+        self._password = password or None
+        self._ssl_context = ssl_context
+        self._client_id = client_id or f"{DOMAIN}_{vin}"
         self._host = host
         self._port = port
         self._vin = vin
@@ -126,15 +135,18 @@ class TeslaMQTTClient:
         self._timeout_seconds = timeout_seconds
 
     def _build_client(self) -> mqtt.Client:
-        client_id = f"{DOMAIN}_{self._vin}"
         client = mqtt.Client(
-            client_id=client_id,
+            client_id=self._client_id,
             protocol=mqtt.MQTTv5,
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
         )
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_mqtt_message
+        if self._username is not None:
+            client.username_pw_set(self._username, self._password)
+        if self._ssl_context is not None:
+            client.tls_set_context(self._ssl_context)
         # paho re-raises callback exceptions by default, which kills its network
         # thread: telemetry stops with no disconnect event and no reconnect.
         client.suppress_exceptions = True

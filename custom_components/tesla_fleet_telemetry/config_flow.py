@@ -13,15 +13,24 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import (
     CONF_CLIENT_ID,
     CONF_CLIENT_SECRET,
     CONF_CONNECTION_TIMEOUT,
     CONF_DOMAIN,
+    CONF_FLEET_API_BASE,
     CONF_MQTT_HOST,
+    CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
+    CONF_MQTT_TLS,
     CONF_MQTT_TOPIC_BASE,
+    CONF_MQTT_USERNAME,
     CONF_PROXY_URL,
     CONF_TELEMETRY_MODE,
     CONF_TELEMETRY_SERVER_CA,
@@ -34,6 +43,7 @@ from .const import (
     DEFAULT_TELEMETRY_MODE,
     DEFAULT_TELEMETRY_SERVER_ENDPOINT,
     DOMAIN,
+    FLEET_API_BASE,
     TELEMETRY_MODE_OPTIONS,
 )
 from .oauth2 import (
@@ -47,7 +57,7 @@ from .oauth2 import (
 )
 from .proxy_client import _INSECURE_SSL, TeslaProxyClient
 from .utils import (
-    der_cert_chain_to_pem_bundle,
+    async_fetch_server_ca,
     extract_first_fields_config,
     normalize_pem_cert_bundle,
 )
@@ -159,83 +169,6 @@ CONF_TELEMETRY_SERVER_ENDPOINT = "telemetry_server_endpoint"
 DEFAULT_HTTPS_PORT = 443
 
 
-async def _async_fetch_server_cert(  # noqa: C901
-    hass: HomeAssistant,
-    hostname: str,
-    port: int,
-) -> tuple[str, bool]:
-    """Connect to telemetry server and return (ca_pem, hostname_verified).
-
-    Fetches the server's TLS certificates regardless of trust status.
-    Returns the leaf/domain certificate (chain[0]) so Tesla pins to the
-    specific server cert rather than a shared intermediate CA.
-    hostname_verified is True if the cert chain and hostname validate against
-    the system CA store.
-    """
-    import socket  # noqa: PLC0415
-    import ssl  # noqa: PLC0415
-
-    def _extract_ca_bundle(ssock: ssl.SSLSocket) -> str | None:
-        for attr in ("get_verified_chain", "get_unverified_chain"):
-            getter = getattr(ssock, attr, None)
-            if not callable(getter):
-                continue
-            try:
-                chain = getter()
-            except Exception as e:  # noqa: S110
-                _LOGGER.debug("Failed to get cert chain via %s: %s", attr, e)
-                continue
-            if isinstance(chain, list | tuple) and len(chain) >= 1:
-                try:
-                    return der_cert_chain_to_pem_bundle([chain[0]])
-                except ValueError:
-                    continue
-        return None
-
-    def _fetch_unverified() -> tuple[str, bytes | None]:
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        with socket.create_connection(
-            (hostname, port),
-            timeout=DEFAULT_CONNECTION_CHECK_TIMEOUT,
-        ) as sock:
-            with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
-                cert_der = ssock.getpeercert(binary_form=True)
-                ca_bundle = _extract_ca_bundle(ssock)
-        if not cert_der:
-            raise ConnectionError("Server did not provide a certificate")
-        if ca_bundle is None:
-            ca_bundle = ssl.DER_cert_to_PEM_cert(cert_der)
-        return ca_bundle, cert_der
-
-    def _verify_trusted() -> tuple[str, bool]:
-        try:
-            ctx2 = ssl.create_default_context()
-            with socket.create_connection(
-                (hostname, port),
-                timeout=DEFAULT_CONNECTION_CHECK_TIMEOUT,
-            ) as s:
-                with ctx2.wrap_socket(s, server_hostname=hostname) as verified_sock:
-                    ca_bundle = _extract_ca_bundle(verified_sock)
-                    if ca_bundle is not None:
-                        return ca_bundle, True
-        except ssl.SSLCertVerificationError:
-            return "", False
-        except OSError as e:
-            _LOGGER.debug("Connection error during cert verification: %s", e)
-        return "", False
-
-    def _do_fetch() -> tuple[str, bool]:
-        fallback_ca_bundle, _ = _fetch_unverified()
-        verified_ca_bundle, hostname_ok = _verify_trusted()
-        if verified_ca_bundle:
-            return verified_ca_bundle, True
-        return fallback_ca_bundle, hostname_ok
-
-    return cast(tuple[str, bool], await hass.async_add_executor_job(_do_fetch))
-
-
 async def _maybe_autofetch_ca(
     hass: HomeAssistant,
     user_input: dict[str, Any],
@@ -253,7 +186,7 @@ async def _maybe_autofetch_ca(
         return user_input  # Let the normal validator raise the correct error.
 
     try:
-        pem, hostname_ok = await _async_fetch_server_cert(hass, hostname, port)
+        pem, hostname_ok = await async_fetch_server_ca(hass, hostname, port)
     except Exception as err:
         _LOGGER.debug("CA auto-fetch failed for %s:%s: %s", hostname, port, err)
         errors[CONF_TELEMETRY_SERVER_CA] = "ca_fetch_failed"
@@ -356,12 +289,27 @@ def _display_proxy_url(proxy_url: str) -> str:
     return proxy_url
 
 
+_PASSWORD_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
+
+
+def _mqtt_auth_schema(values: dict[str, Any]) -> dict[Any, Any]:
+    """Optional MQTT credentials/TLS fields shared by the setup and options forms."""
+    return {
+        vol.Optional(CONF_MQTT_USERNAME, default=values.get(CONF_MQTT_USERNAME, "")): str,
+        vol.Optional(
+            CONF_MQTT_PASSWORD, default=values.get(CONF_MQTT_PASSWORD, "")
+        ): _PASSWORD_SELECTOR,
+        vol.Optional(CONF_MQTT_TLS, default=bool(values.get(CONF_MQTT_TLS, False))): bool,
+    }
+
+
 def _build_user_schema(
     mqtt_endpoint: str = "",
     proxy_url: str = "",
     telemetry_endpoint: str = DEFAULT_TELEMETRY_SERVER_ENDPOINT,
     telemetry_mode: str = DEFAULT_TELEMETRY_MODE,
     domain: str = "",
+    mqtt_auth: dict[str, Any] | None = None,
 ) -> vol.Schema:
     """Build the setup form schema."""
     return vol.Schema(
@@ -372,6 +320,7 @@ def _build_user_schema(
                 TELEMETRY_MODE_OPTIONS
             ),
             vol.Required(CONF_MQTT_ENDPOINT, default=mqtt_endpoint): str,
+            **_mqtt_auth_schema(mqtt_auth or {}),
             vol.Optional(CONF_MQTT_TOPIC_BASE, default=DEFAULT_MQTT_TOPIC_BASE): str,
             vol.Required(CONF_PROXY_URL, default=proxy_url): str,
         }
@@ -409,6 +358,7 @@ def _build_options_schema(merged: dict[str, Any]) -> vol.Schema:
                     else ""
                 ),
             ): str,
+            **_mqtt_auth_schema(merged),
             vol.Optional(
                 CONF_MQTT_TOPIC_BASE,
                 default=merged.get(CONF_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE),
@@ -440,6 +390,7 @@ async def _async_try_partner_registration(
     client_id: str,
     client_secret: str,
     domain: str,
+    api_base: str,
 ) -> tuple[str, str] | None:
     """Attempt Tesla partner account registration and public key verification.
 
@@ -447,9 +398,12 @@ async def _async_try_partner_registration(
     so the caller can surface the exact API message in the form.
     Returns None on success or transient network/server errors (non-blocking).
     """
-    _LOGGER.debug("Attempting partner domain registration with Tesla for domain: %s", domain)
+    _LOGGER.debug(
+        "Attempting partner domain registration with Tesla for domain %s on %s", domain, api_base
+    )
     try:
-        token = await async_fetch_partner_token(client_id, client_secret)
+        # Partner tokens and registrations are per region: use the account's host.
+        token = await async_fetch_partner_token(client_id, client_secret, api_base)
         _LOGGER.debug("Partner token obtained for domain: %s", domain)
     except Exception as err:
         _LOGGER.warning(
@@ -460,7 +414,7 @@ async def _async_try_partner_registration(
         return None
 
     try:
-        await async_register_partner_domain(token, domain)
+        await async_register_partner_domain(token, domain, api_base)
         _LOGGER.info("Partner domain registered with Tesla: %s", domain)
     except PartnerDomainError as err:
         _LOGGER.warning(
@@ -478,7 +432,7 @@ async def _async_try_partner_registration(
         return None
 
     try:
-        await async_check_partner_public_key(token, domain)
+        await async_check_partner_public_key(token, domain, api_base)
         _LOGGER.info("Partner public key verified for domain: %s", domain)
     except Exception as err:
         _LOGGER.warning(
@@ -593,6 +547,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
         self._selected_vin: str | None = None
         self._existing_car_telemetry_config: dict[str, Any] | None = None
         self._pending_telemetry_input: dict[str, Any] | None = None
+        self._fleet_api_base: str = FLEET_API_BASE
 
     @property
     def logger(self) -> logging.Logger:
@@ -669,6 +624,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         DEFAULT_TELEMETRY_MODE,
                     ),
                     domain=user_input.get(CONF_DOMAIN, ""),
+                    mqtt_auth=user_input,
                 ),
                 errors=errors,
             )
@@ -680,7 +636,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
 
         # Auto-fetch CA certificate from the telemetry server (also verifies reachability).
         try:
-            pem, hostname_ok = await _async_fetch_server_cert(self.hass, hostname, port)
+            pem, hostname_ok = await async_fetch_server_ca(self.hass, hostname, port)
             ca = normalize_pem_cert_bundle(pem)
         except Exception as err:
             _LOGGER.debug("CA auto-fetch failed for %s:%s: %s", hostname, port, err)
@@ -698,6 +654,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         DEFAULT_TELEMETRY_MODE,
                     ),
                     domain=normalized_input.get(CONF_DOMAIN, ""),
+                    mqtt_auth=normalized_input,
                 ),
                 errors={"base": "ca_fetch_failed"},
             )
@@ -722,6 +679,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         DEFAULT_TELEMETRY_MODE,
                     ),
                     domain=normalized_input.get(CONF_DOMAIN, ""),
+                    mqtt_auth=normalized_input,
                 ),
                 errors={"base": "ca_hostname_mismatch"},
             )
@@ -750,6 +708,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                         CONF_TELEMETRY_MODE, DEFAULT_TELEMETRY_MODE
                     ),
                     domain=self._user_input.get(CONF_DOMAIN, ""),
+                    mqtt_auth=self._user_input,
                 ),
                 errors={CONF_DOMAIN: reg_error_key},
                 description_placeholders={"partner_error": reg_error_detail},
@@ -802,7 +761,9 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             # Transient network errors are ignored so they don't block reauth.
             reauth_vins: list[str] | None = None
             try:
-                reauth_vins = await async_fetch_available_vins(token["access_token"])
+                reauth_vins, self._fleet_api_base = await async_fetch_available_vins(
+                    token["access_token"]
+                )
             except Exception as err:
                 err_str = str(err).lower()
                 if any(
@@ -834,6 +795,8 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                 "auth_implementation": auth_implementation,
                 "token": token,
             }
+            if reauth_vins is not None:
+                merged_data[CONF_FLEET_API_BASE] = self._fleet_api_base
             # The entry has no update listener (routine token refreshes must not
             # reload it), so reauth schedules its own reload here.
             return self.async_update_reload_and_abort(
@@ -842,7 +805,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             )
 
         try:
-            vins = await async_fetch_available_vins(token["access_token"])
+            vins, self._fleet_api_base = await async_fetch_available_vins(token["access_token"])
         except Exception as err:
             _LOGGER.error("Failed to fetch VINs from Fleet API: %s", err)
             return self.async_abort(reason="vin_fetch_failed")
@@ -889,7 +852,9 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                 bool(client_secret),
             )
             return None
-        return await _async_try_partner_registration(client_id, client_secret, domain)
+        return await _async_try_partner_registration(
+            client_id, client_secret, domain, self._fleet_api_base
+        )
 
     async def _async_proceed_to_vin_or_telemetry(self) -> ConfigFlowResult:
         """Route to VIN selection or directly to telemetry prep, depending on vehicle count."""
@@ -999,6 +964,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
         merged_data = {
             **self._user_input,
             CONF_VIN: vin,
+            CONF_FLEET_API_BASE: self._fleet_api_base,
             "auth_implementation": auth_implementation,
             "token": token,
         }
@@ -1174,7 +1140,12 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
                 new_domain,
             )
             return None
-        return await _async_try_partner_registration(client_id, client_secret, new_domain)
+        return await _async_try_partner_registration(
+            client_id,
+            client_secret,
+            new_domain,
+            self._entry.data.get(CONF_FLEET_API_BASE, FLEET_API_BASE),
+        )
 
     async def _process_options_input(
         self, user_input: dict[str, Any], errors: dict[str, str]
