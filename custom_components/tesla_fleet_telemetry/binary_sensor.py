@@ -28,7 +28,7 @@ from .coordinator import TelemetryCoordinator
 from .device import build_device_info
 from .entity_base import TelemetryEntity, telemetry_unique_id
 from .fleet_config import PolicyState
-from .utils import door_state_tokens
+from .utils import door_state_tokens, tire_location_flags
 
 ASYNC_DISPATCHER_CONNECT = cast(
     Callable[[HomeAssistant, str, Callable[[dict[str, Any]], None]], Callable[[], None]],
@@ -40,6 +40,27 @@ _DOOR_SENSORS = (
     ("Door Front Right", "door_front_right", ("pf", "fp", "front_right", "passenger_front")),
     ("Door Rear Left", "door_rear_left", ("dr", "rd", "rear_left", "driver_rear")),
     ("Door Rear Right", "door_rear_right", ("pr", "rp", "rear_right", "passenger_rear")),
+)
+
+_TPMS_AGGREGATE_FIELDS = frozenset({"TpmsHardWarnings", "TpmsSoftWarnings"})
+
+# (unique_id suffix, name, aggregate field, TireLocation position). The suffixes
+# keep the unique_ids of the earlier per-wheel entities, which were bound to
+# telemetry fields Tesla does not provide.
+_TPMS_WHEEL_SENSORS = tuple(
+    (
+        f"Tpms{kind}Warning{abbr}",
+        f"TPMS {kind} Warning {abbr.upper()}",
+        f"Tpms{kind}Warnings",
+        position,
+    )
+    for kind in ("Hard", "Soft")
+    for abbr, position in (
+        ("Fl", "front_left"),
+        ("Fr", "front_right"),
+        ("Rl", "rear_left"),
+        ("Rr", "rear_right"),
+    )
 )
 
 
@@ -60,6 +81,9 @@ async def async_setup_entry(
     ]
     entities.extend(TeslaDoorStateBinarySensor(coordinator, vin, *args) for args in _DOOR_SENSORS)
     entities.extend(
+        TpmsWheelWarningBinarySensor(coordinator, vin, *args) for args in _TPMS_WHEEL_SENSORS
+    )
+    entities.extend(
         [
             TeslaAnyDoorOpenBinarySensor(coordinator, vin),
             TelemetryConfigSyncedBinarySensor(coordinator, vin, policy_state, entry.entry_id),
@@ -78,19 +102,17 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
         coordinator: TelemetryCoordinator,
         description: TelemetryEntityDescription,
         vin: str,
+        *,
+        field: str | None = None,
     ) -> None:
-        super().__init__(coordinator, description, vin)
+        super().__init__(coordinator, description, vin, field=field)
         self.entity_description = cast(BinarySensorEntityDescription, description)
 
     @property
     def is_on(self) -> bool | None:
         val = self.raw_value
         if val is None:
-            if self.restored_state == STATE_ON:
-                return True
-            if self.restored_state == STATE_OFF:
-                return False
-            return None
+            return self._restored_is_on()
 
         key = self.entity_description.key
         if key == "Hvil":
@@ -99,11 +121,23 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
             return self._is_on_charge_port_latch(val)
         if key == "DriveRail" and isinstance(val, str):
             return "Dual" in val
+        if key in _TPMS_AGGREGATE_FIELDS:
+            flags = tire_location_flags(val)
+            if flags is not None:
+                return any(flags.values())
 
         if isinstance(val, bool):
             return val
         if isinstance(val, int | float):
             return bool(val)
+        return None
+
+    def _restored_is_on(self) -> bool | None:
+        """Return the restored on/off state while no live value has arrived."""
+        if self.restored_state == STATE_ON:
+            return True
+        if self.restored_state == STATE_OFF:
+            return False
         return None
 
     def _is_on_hvil(self, val: Any) -> bool | None:
@@ -146,13 +180,44 @@ class TelemetryBinarySensor(TelemetryEntity, BinarySensorEntity):
         return val.strip().strip('"').strip("'").strip()
 
 
+class TpmsWheelWarningBinarySensor(TelemetryBinarySensor):
+    """Per-wheel TPMS warning derived from a TireLocation aggregate field."""
+
+    def __init__(
+        self,
+        coordinator: TelemetryCoordinator,
+        vin: str,
+        unique_suffix: str,
+        name: str,
+        aggregate_field: str,
+        position: str,
+    ) -> None:
+        description = TelemetryEntityDescription(
+            binary=True,
+            key=unique_suffix,
+            name=name,
+            device_class=BinarySensorDeviceClass.PROBLEM,
+            icon="mdi:tire-alert",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        )
+        super().__init__(coordinator, description, vin, field=aggregate_field)
+        self._position = position
+
+    @property
+    def is_on(self) -> bool | None:
+        flags = tire_location_flags(self.raw_value)
+        if flags is None:
+            return self._restored_is_on()
+        return flags[self._position]
+
+
 class _DoorBinarySensorBase(
     CoordinatorEntity[TelemetryCoordinator], RestoreEntity, BinarySensorEntity
 ):
     """Shared restore-on-reload logic for DoorState-derived binary sensors."""
 
     def __init__(self, coordinator: TelemetryCoordinator) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, context=frozenset({"DoorState"}))
         self._restored_is_on: bool | None = None
 
     async def async_added_to_hass(self) -> None:

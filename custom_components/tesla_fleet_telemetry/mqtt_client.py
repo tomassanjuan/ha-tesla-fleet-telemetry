@@ -7,7 +7,9 @@ import json
 import logging
 import math
 import ssl
+import threading
 import time
+from collections import deque
 from collections.abc import Callable
 from typing import Any
 
@@ -131,6 +133,10 @@ class TeslaMQTTClient:
         self._error_cleanup_at = 0.0
         self._connect_waiter: asyncio.Future[None] | None = None
         self._timeout_seconds = timeout_seconds
+        # Field updates queued by paho's network thread for the event loop.
+        self._pending_fields: deque[tuple[str, Any]] = deque()
+        self._pending_lock = threading.Lock()
+        self._drain_scheduled = False
 
     def _build_client(self) -> mqtt.Client:
         client = mqtt.Client(
@@ -193,18 +199,10 @@ class TeslaMQTTClient:
             if status is not None:
                 if isinstance(status, str):
                     status = status.capitalize()
-                self._hass.loop.call_soon_threadsafe(
-                    self._on_message,
-                    "ConnectivityStatus",
-                    status,
-                )
+                self._enqueue_field("ConnectivityStatus", status)
             network_interface = value.get("NetworkInterface")
             if network_interface is not None:
-                self._hass.loop.call_soon_threadsafe(
-                    self._on_message,
-                    "NetworkInterface",
-                    network_interface,
-                )
+                self._enqueue_field("NetworkInterface", network_interface)
             return
         if topic.startswith(self._alerts_prefix):
             if self._on_alert and isinstance(value, dict):
@@ -236,7 +234,38 @@ class TeslaMQTTClient:
         if not topic.startswith(self._topic_prefix):
             return
         field = topic[len(self._topic_prefix) :]
-        self._hass.loop.call_soon_threadsafe(self._on_message, field, value)
+        self._enqueue_field(field, value)
+
+    def _enqueue_field(self, field: str, value: Any) -> None:
+        """Queue a field update from paho's thread for the event loop.
+
+        A burst of messages (the vehicle sends many fields per record) wakes
+        the event loop once and is drained in a single callback, instead of
+        one call_soon_threadsafe (and loop wakeup) per message.
+        """
+        with self._pending_lock:
+            self._pending_fields.append((field, value))
+            if self._drain_scheduled:
+                return
+            self._drain_scheduled = True
+        try:
+            self._hass.loop.call_soon_threadsafe(self._drain_pending_fields)
+        except RuntimeError:
+            with self._pending_lock:
+                self._drain_scheduled = False
+            raise
+
+    def _drain_pending_fields(self) -> None:
+        """Deliver queued field updates on the event loop, in arrival order."""
+        with self._pending_lock:
+            items = list(self._pending_fields)
+            self._pending_fields.clear()
+            self._drain_scheduled = False
+        for field, value in items:
+            try:
+                self._on_message(field, value)
+            except Exception:
+                _LOGGER.exception("Error handling Tesla telemetry field %s", field)
 
     def _finish_connect(self, err: Exception | None = None) -> None:
         waiter = self._connect_waiter

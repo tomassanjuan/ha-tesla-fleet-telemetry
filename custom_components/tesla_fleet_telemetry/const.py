@@ -67,8 +67,9 @@ MQTT_BACKOFF_BASE_SECONDS = 1
 MQTT_BACKOFF_MAX_SECONDS = 60
 MQTT_KEEPALIVE_SECONDS = 60
 
-# Seconds to wait after sending wake_up before retrying the original command
-WAKE_UP_RETRY_DELAY_SECONDS = 12
+# Wake-and-retry timing for commands sent while the vehicle is asleep
+WAKE_UP_RETRY_DELAY_SECONDS = 12  # max wait for the vehicle to report connected
+WAKE_UP_CONNECTED_SETTLE_SECONDS = 2  # grace after connect before retrying a command
 WAKE_UP_SYNC_RECHECK_DELAY_SECONDS = 30
 # Retry delay for failed fleet_telemetry_config push during bootstrap
 BOOTSTRAP_PUSH_RETRY_DELAY_SECONDS = 30
@@ -229,6 +230,26 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:flash",
         entity_registry_enabled_default=True,
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="BrickSocMinPercent",
+        name="Brick SoC Min",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:battery-low",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="NominalFullPackEnergyKwh",
+        name="Nominal Full Pack Energy",
+        native_unit_of_measurement="kWh",
+        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:battery-heart-variant",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        minimum_delta_override=0.1,
     ),
     TelemetryEntityDescription(
         key="ChargeAmps",
@@ -563,6 +584,25 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     TelemetryEntityDescription(
+        key="DiTorquemotor",
+        name="Motor Torque Command",
+        native_unit_of_measurement="Nm",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:engine",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="DiVBatR",
+        name="Rear Inverter DC Voltage",
+        native_unit_of_measurement="V",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:flash",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
         key="Gear",
         name="Gear",
         icon="mdi:car-shift-pattern",
@@ -890,6 +930,26 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:lightning-bolt-circle",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=True,
+    ),
+    TelemetryEntityDescription(
+        key="LifetimeEnergyChargedKwh",
+        name="Lifetime Energy Charged",
+        native_unit_of_measurement="kWh",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=0,
+        icon="mdi:battery-charging-high",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="LifetimeEnergyGainedRegen",
+        name="Lifetime Regen Energy",
+        native_unit_of_measurement="kWh",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=0,
+        icon="mdi:battery-arrow-up",
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # --- Self-Driving Stats ---
     TelemetryEntityDescription(
@@ -1222,6 +1282,29 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="Software Update Version",
         icon="mdi:update",
         entity_registry_enabled_default=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="SoftwareUpdateAvailable",
+        has_dedicated_entity=True,
+        name="Software Update Available",
+        device_class=BinarySensorDeviceClass.UPDATE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="SoftwareUpdateInProgress",
+        has_dedicated_entity=True,
+        name="Software Update In Progress",
+        icon="mdi:progress-download",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="SunroofInstalled",
+        name="Sunroof",
+        icon="mdi:car-select",
+        strip_prefix="SunroofInstalledState",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     TelemetryEntityDescription(
@@ -1574,6 +1657,13 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
     ),
     TelemetryEntityDescription(
         binary=True,
+        key="RemoteStartActive",
+        name="Remote Start Active",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        icon="mdi:car-key",
+    ),
+    TelemetryEntityDescription(
+        binary=True,
         key="RightHandDrive",
         name="Right Hand Drive",
         icon="mdi:steering",
@@ -1694,70 +1784,6 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # --- TPMS ---
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsHardWarningFl",
-        name="TPMS Hard Warning FL",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsHardWarningFr",
-        name="TPMS Hard Warning FR",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsHardWarningRl",
-        name="TPMS Hard Warning RL",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsHardWarningRr",
-        name="TPMS Hard Warning RR",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsSoftWarningFl",
-        name="TPMS Soft Warning FL",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsSoftWarningFr",
-        name="TPMS Soft Warning FR",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsSoftWarningRl",
-        name="TPMS Soft Warning RL",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    TelemetryEntityDescription(
-        binary=True,
-        key="TpmsSoftWarningRr",
-        name="TPMS Soft Warning RR",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        icon="mdi:tire-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
     TelemetryEntityDescription(
         binary=True,
         key="TpmsHardWarnings",
@@ -2015,19 +2041,20 @@ ENTITY_FIELD_MAPPINGS: dict[str, TelemetryEntityMapping] = {
                 "SoftwareUpdateVersion",
                 "SoftwareUpdateDownloadPercentComplete",
                 "SoftwareUpdateInstallationPercentComplete",
+                "SoftwareUpdateAvailable",
+                "SoftwareUpdateInProgress",
             }
         )
     ),
-    "tpms_hard_warnings": TelemetryEntityMapping(
-        frozenset(
-            {"TpmsHardWarningFl", "TpmsHardWarningFr", "TpmsHardWarningRl", "TpmsHardWarningRr"}
+    # Per-wheel TPMS warnings are derived from the TireLocation-valued
+    # aggregate fields; Tesla has no per-wheel warning telemetry fields.
+    **{
+        f"Tpms{kind}Warning{wheel}": TelemetryEntityMapping(
+            frozenset({f"Tpms{kind}Warnings"}), enabled_by_default=False
         )
-    ),
-    "tpms_soft_warnings": TelemetryEntityMapping(
-        frozenset(
-            {"TpmsSoftWarningFl", "TpmsSoftWarningFr", "TpmsSoftWarningRl", "TpmsSoftWarningRr"}
-        )
-    ),
+        for kind in ("Hard", "Soft")
+        for wheel in ("Fl", "Fr", "Rl", "Rr")
+    },
 }
 
 DERIVED_SENSOR_UNIQUE_ID_SUFFIXES: frozenset[str] = frozenset(

@@ -140,6 +140,26 @@ def door_state_tokens(value: object) -> set[str]:
     return set(re.findall(r"[a-z0-9_]+", normalized_text))
 
 
+TIRE_POSITIONS: tuple[str, ...] = ("front_left", "front_right", "rear_left", "rear_right")
+
+
+def tire_location_flags(value: object) -> dict[str, bool] | None:
+    """Parse a TireLocation telemetry payload (TpmsHardWarnings/TpmsSoftWarnings).
+
+    fleet-telemetry publishes the proto message as a JSON object keyed by the
+    proto field names (front_left, front_right, ...). Proto3 omits false fields,
+    so a missing wheel means "no warning" and an empty object means all clear.
+    CamelCase keys (FrontLeft) are accepted too. Returns None for any other shape.
+    """
+    if not isinstance(value, dict):
+        return None
+    normalized = {str(key).replace("_", "").lower(): raw for key, raw in value.items()}
+    return {
+        position: bool(coerce_bool(normalized.get(position.replace("_", ""))))
+        for position in TIRE_POSITIONS
+    }
+
+
 def normalize_pem_cert_bundle(value: object) -> str:
     """Normalize one or more PEM certificates into a canonical bundle string."""
     if not isinstance(value, str):

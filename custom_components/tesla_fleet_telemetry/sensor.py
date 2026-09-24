@@ -35,6 +35,12 @@ ASYNC_DISPATCHER_CONNECT = cast(
 )
 
 
+# Fields read by extra_state_attributes besides the entity's own field.
+_EXTRA_ATTRIBUTE_FIELDS: dict[str, frozenset[str]] = {
+    "ConnectivityStatus": frozenset({"NetworkInterface"}),
+}
+
+
 def _float_field(coordinator: TelemetryCoordinator, field: str) -> float | None:
     """Return a telemetry field as a float when possible."""
     value = coordinator.get_field(field)
@@ -221,7 +227,12 @@ class TelemetrySensor(TelemetryEntity, SensorEntity):
         description: TelemetryEntityDescription,
         vin: str,
     ) -> None:
-        super().__init__(coordinator, description, vin)
+        super().__init__(
+            coordinator,
+            description,
+            vin,
+            extra_fields=_EXTRA_ATTRIBUTE_FIELDS.get(description.key, frozenset()),
+        )
         self.entity_description = description
 
     @property
@@ -378,7 +389,11 @@ class DerivedTelemetrySensor(RestoreEntity, SensorEntity):
                 value = None
             if value is not None:
                 self._restored_native_value = int(value) if value == int(value) else value
-        self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))
+        self.async_on_remove(
+            self.coordinator.async_add_listener(
+                self.async_write_ha_state, self.entity_description.source_fields
+            )
+        )
 
 
 class TelemetryLastPushSensor(SensorEntity):
