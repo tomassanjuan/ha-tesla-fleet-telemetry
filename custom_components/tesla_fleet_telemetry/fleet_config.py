@@ -37,6 +37,9 @@ from .utils import normalize_pem_cert_bundle
 
 _LOGGER = logging.getLogger(__name__)
 
+# Upper bound on per-push retries after Tesla rejects an unsupported field interval.
+MAX_UNSUPPORTED_INTERVAL_RETRIES = 5
+
 
 @dataclass
 class PolicyState:
@@ -266,7 +269,6 @@ def _is_fatal_fleet_config_push_error(err: Exception) -> bool:
         "invalidrequest" in message
         or "request body is not valid" in message
         or "not valid" in message
-        or "telemetry server ca is not a valid pem bundle" in message
     )
 
 
@@ -788,10 +790,16 @@ async def _push_telemetry_config(
         if field in FIELD_DEFS and field in SUPPORTED_STREAMING_FIELDS
     }
 
-    config, fast_field_count, slow_field_count = _build_managed_fleet_config(
-        required_fields,
-        policy_context,
-    )
+    try:
+        config, fast_field_count, slow_field_count = _build_managed_fleet_config(
+            required_fields,
+            policy_context,
+        )
+    except ValueError as err:
+        raise HomeAssistantError(
+            "Telemetry server CA certificate is not a valid PEM bundle; re-enter the "
+            "telemetry endpoint in the integration options"
+        ) from err
     managed_fields = config["fields"]
     _LOGGER.debug(
         "fleet_telemetry_config push target for %s: hostname=%s port=%s ca=%s",
@@ -809,6 +817,9 @@ async def _push_telemetry_config(
         "policy_key": policy_context.policy_key,
         "reason": reason,
     }
+    # Intervals Tesla told us it will accept, keyed by field. Returned on every
+    # result (success or failure) so the caller can remember them for later pushes.
+    authorized_overrides: dict[str, int] = {}
 
     try:
         _LOGGER.info(
@@ -820,17 +831,43 @@ async def _push_telemetry_config(
             fast_field_count,
             slow_field_count,
         )
-        return await _do_push_and_sync(
-            proxy_client,
-            vin,
-            access_token,
-            config,
-            base_result,
-            wait_for_sync,
-            seen_error_keys,
-            sync_status_callback,
-            hass,
-        )
+        while True:
+            try:
+                return await _do_push_and_sync(
+                    proxy_client,
+                    vin,
+                    access_token,
+                    config,
+                    base_result,
+                    wait_for_sync,
+                    seen_error_keys,
+                    sync_status_callback,
+                    hass,
+                    authorized_interval_overrides=dict(authorized_overrides),
+                )
+            except (TokenRevokedError, RateLimitedError):
+                raise
+            except Exception as err:
+                # Tesla rejects one unsupported interval per request, so retry once
+                # per distinct field until the payload is accepted.
+                unsupported = extract_unsupported_interval(err)
+                if (
+                    unsupported is None
+                    or unsupported[0] not in managed_fields
+                    or unsupported[0] in authorized_overrides
+                    or len(authorized_overrides) >= MAX_UNSUPPORTED_INTERVAL_RETRIES
+                ):
+                    raise
+                field_name, authorized_interval = unsupported
+                _LOGGER.warning(
+                    "Tesla rejected %s at %ss for %s; retrying at authorized %ss",
+                    field_name,
+                    managed_fields[field_name]["interval_seconds"],
+                    vin,
+                    authorized_interval,
+                )
+                managed_fields[field_name]["interval_seconds"] = authorized_interval
+                authorized_overrides[field_name] = authorized_interval
     except TokenRevokedError as err:
         raise ConfigEntryAuthFailed(
             "Tesla OAuth token was revoked — re-authentication required"
@@ -842,40 +879,18 @@ async def _push_telemetry_config(
             rate_limited=True,
             retry_after=err.retry_after,
             error=str(err),
+            authorized_interval_overrides=dict(authorized_overrides),
         )
     except Exception as err:
-        unsupported = extract_unsupported_interval(err)
-        if unsupported is not None:
-            field_name, authorized_interval = unsupported
-            if field_name in managed_fields:
-                managed_fields[field_name]["interval_seconds"] = authorized_interval
-                _LOGGER.warning(
-                    "Tesla rejected %s at %ss for %s; retrying at authorized %ss",
-                    field_name,
-                    default_field_policy(field_name, policy_context)["interval_seconds"],
-                    vin,
-                    authorized_interval,
-                )
-                try:
-                    return await _do_push_and_sync(
-                        proxy_client,
-                        vin,
-                        access_token,
-                        config,
-                        base_result,
-                        wait_for_sync,
-                        seen_error_keys,
-                        sync_status_callback,
-                        hass,
-                        retried_field=field_name,
-                        authorized_interval=authorized_interval,
-                    )
-                except Exception as retry_err:
-                    err = retry_err
         _log_fleet_config_push_error(vin, err)
         if _is_fatal_fleet_config_push_error(err):
             raise HomeAssistantError(
                 "Tesla rejected the fleet telemetry configuration; check generated payload fields, "
                 "telemetry endpoint, port, and CA certificate"
             ) from err
-        return _build_push_result(base_result, pushed=False, error=str(err))
+        return _build_push_result(
+            base_result,
+            pushed=False,
+            error=str(err),
+            authorized_interval_overrides=dict(authorized_overrides),
+        )

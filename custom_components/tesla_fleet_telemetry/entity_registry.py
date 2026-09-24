@@ -16,6 +16,7 @@ from .const import (
     DEVICE_METADATA_FIELDS,
     ENTITY_FIELD_MAPPINGS,
     FIELD_DEFS,
+    MIN_AUTOMATIC_PUSH_INTERVAL_SECONDS,
     SUPPORTED_STREAMING_FIELDS,
 )
 
@@ -150,13 +151,43 @@ def _register_entity_registry_sync_listener(  # noqa: C901
 
     vin = entry.data[CONF_VIN]
     _debounce_handle: asyncio.TimerHandle | None = None
+    _unloaded = False
+
+    @callback
+    def _schedule_resync(delay: float) -> None:
+        nonlocal _debounce_handle
+        if _unloaded:
+            return
+        if _debounce_handle is not None:
+            _debounce_handle.cancel()
+        _debounce_handle = hass.loop.call_later(delay, lambda: hass.async_create_task(_resync()))
+
+    def _throttle_remaining(policy_state) -> float:
+        """Seconds until an automatic push would no longer be throttled."""
+        now = hass.loop.time()
+        remaining = policy_state.rate_limited_until - now
+        last_push = policy_state.last_push_monotonic
+        if isinstance(last_push, int | float):
+            remaining = max(remaining, last_push + MIN_AUTOMATIC_PUSH_INTERVAL_SECONDS - now)
+        return max(remaining, 0.0)
 
     async def _resync() -> None:
         try:
             entry_data = getattr(entry, "runtime_data", None)
             if not entry_data:
                 return
-            await entry_data.push_telemetry_config(reason="entity_registry")
+            result = await entry_data.push_telemetry_config(reason="entity_registry")
+            # A throttled push would otherwise drop this change until the next
+            # reload; retry once the throttle window has passed.
+            if isinstance(result, dict) and result.get("skipped"):
+                delay = _throttle_remaining(entry_data.policy_state) + 1.0
+                _LOGGER.debug(
+                    "fleet_telemetry_config resync for %s skipped (%s); retrying in %.0fs",
+                    vin,
+                    result.get("skip_reason"),
+                    delay,
+                )
+                _schedule_resync(delay)
         except ConfigEntryAuthFailed:
             _LOGGER.warning(
                 "Tesla authentication failed during fleet config resync for %s — "
@@ -169,7 +200,6 @@ def _register_entity_registry_sync_listener(  # noqa: C901
 
     @callback
     def _handle_entity_registry_change(event) -> None:
-        nonlocal _debounce_handle
         if event.data.get("action") != "update":
             return
         changes = event.data.get("changes")
@@ -201,16 +231,15 @@ def _register_entity_registry_sync_listener(  # noqa: C901
         )
         # Debounce: cancel any pending resync and schedule a fresh one 2 seconds out.
         # This coalesces rapid bursts of entity enable/disable into a single push.
-        if _debounce_handle is not None:
-            _debounce_handle.cancel()
-        _debounce_handle = hass.loop.call_later(2.0, lambda: hass.async_create_task(_resync()))
+        _schedule_resync(2.0)
 
     event_name = getattr(er, "EVENT_ENTITY_REGISTRY_UPDATED", "entity_registry_updated")
     unsubscribe = hass.bus.async_listen(event_name, _handle_entity_registry_change)
 
     @callback
     def _unload() -> None:
-        nonlocal _debounce_handle
+        nonlocal _debounce_handle, _unloaded
+        _unloaded = True
         unsubscribe()
         if _debounce_handle is not None:
             _debounce_handle.cancel()

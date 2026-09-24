@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .command_entity import CommandEntity
@@ -261,7 +262,7 @@ class TeslaSeatLevelSelect(CommandEntity, SelectEntity):
         elif option.startswith(_COOL_PREFIX):
             cool_level = _OPTION_TO_LEVEL[option.removeprefix(_COOL_PREFIX)]
         elif option != _SEAT_OFF_OPTION:
-            raise ValueError(f"Unknown seat climate option: {option}")
+            raise ServiceValidationError(f"Unknown seat climate option: {option}")
 
         heat_body: dict[str, Any] = {self._select_def.level_key: heat_level}
         if self._select_def.seat_key is not None:

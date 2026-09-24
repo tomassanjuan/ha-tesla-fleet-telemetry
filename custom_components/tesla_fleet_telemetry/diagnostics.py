@@ -89,7 +89,7 @@ async def async_get_config_entry_diagnostics(
             if policy_state.last_push_dt
             else None,
             "last_result": _redact_push_result(policy_state.last_result),
-            "rate_limited": policy_state.rate_limited_until > asyncio.get_event_loop().time(),
+            "rate_limited": policy_state.rate_limited_until > asyncio.get_running_loop().time(),
         }
 
     return {

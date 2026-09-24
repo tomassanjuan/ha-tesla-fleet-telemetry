@@ -71,7 +71,18 @@
       "reauth_not_possible": "Unable to start reauthentication for this entry.",
       "already_in_progress": "Tesla authorization is already in progress. Finish the open authorization window or restart Home Assistant to clear the abandoned flow.",
       "vin_fetch_failed": "Unable to fetch vehicles from Tesla Fleet API.",
-      "no_vehicles": "No vehicles were returned for this Tesla account."
+      "no_vehicles": "No vehicles were returned for this Tesla account.",
+      "wrong_account": "The Tesla account you signed in with does not have access to this vehicle. Sign in with the account that owns it.",
+      "reauth_successful": "Re-authentication was successful.",
+      "missing_configuration": "The Tesla application credentials are not configured. Add them under Settings → Devices & Services → Application Credentials.",
+      "missing_credentials": "The Tesla application credentials are not configured. Add them under Settings → Devices & Services → Application Credentials.",
+      "authorize_url_timeout": "Timed out generating the Tesla authorization URL.",
+      "no_url_available": "No Home Assistant URL is available. Check your network settings.",
+      "oauth_error": "Tesla returned invalid token data.",
+      "oauth_timeout": "Timed out resolving the Tesla OAuth token.",
+      "oauth_unauthorized": "Tesla rejected the authorization while obtaining an access token.",
+      "oauth_failed": "Error while obtaining the Tesla access token.",
+      "user_rejected_authorize": "Tesla account authorization was rejected."
     }
   },
   "options": {
@@ -107,6 +118,9 @@
       "ca_fetch_failed": "Could not connect to the telemetry server to fetch the certificate. Check hostname, port, TLS certificate, and firewall.",
       "ca_hostname_mismatch": "Certificate fetched but hostname validation failed. The certificate must match the telemetry server hostname.",
       "partner_register_failed": "Tesla rejected the domain: {partner_error}"
+    },
+    "abort": {
+      "reauth_not_possible": "The pending options could not be applied. Open the options again."
     }
   },
   "issues": {
@@ -121,7 +135,7 @@
         },
         "abort": {
           "entry_not_found": "Could not find the Tesla Fleet Telemetry integration entry for this vehicle.",
-          "still_not_paired": "The virtual key for **{vin}** is still not paired. Open the Tesla app and pair the key, then click Fix again.",
+          "still_not_paired": "The virtual key for **{vin}** is still not paired. Open the Tesla app and pair the key, then click Fix again.\n\n[Pair key]({pairing_url})",
           "repair_failed": "Failed to check the virtual key pairing status. Ensure your telemetry server is reachable and try again."
         }
       }

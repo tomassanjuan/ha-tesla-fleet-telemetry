@@ -800,8 +800,9 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             # Validate the new token before committing it. A successful VIN fetch
             # confirms the token has the right scopes and the account is accessible.
             # Transient network errors are ignored so they don't block reauth.
+            reauth_vins: list[str] | None = None
             try:
-                await async_fetch_available_vins(token["access_token"])
+                reauth_vins = await async_fetch_available_vins(token["access_token"])
             except Exception as err:
                 err_str = str(err).lower()
                 if any(
@@ -824,6 +825,9 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                     )
                 # Non-auth error (network, 5xx) — proceed and let the integration retry
                 _LOGGER.debug("Reauth VIN validation skipped due to transient error: %s", err)
+            if reauth_vins is not None and self.reauth_entry.data[CONF_VIN] not in reauth_vins:
+                # Signed in with a Tesla account that can't see this vehicle.
+                return self.async_abort(reason="wrong_account")
 
             merged_data = {
                 **self._user_input,
@@ -845,6 +849,13 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
 
         if not vins:
             return self.async_abort(reason="no_vehicles")
+
+        # Drop vehicles that already have an entry now, rather than letting the
+        # user fill in the whole connection form before the unique_id check aborts.
+        configured = {entry.unique_id for entry in self._async_current_entries()}
+        vins = [vin for vin in vins if vin not in configured]
+        if not vins:
+            return self.async_abort(reason="already_configured")
 
         self._pending_oauth_data = data
         self._available_vins = vins

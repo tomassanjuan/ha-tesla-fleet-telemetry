@@ -278,7 +278,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
             return result
         except asyncio.CancelledError:
             raise
-        except (TimeoutError, OSError) as err:
+        except ConfigEntryAuthFailed:
+            # Runs as a detached task for manual pushes: nobody awaits it, so
+            # surface the auth failure here instead of as an unhandled task error.
+            _LOGGER.warning(
+                "Tesla authentication failed during fleet config sync for %s — "
+                "re-authentication required",
+                vin,
+            )
+            entry.async_start_reauth(hass)
+            result = {**base_result, "sync_pending": False, "synced": False, "error": "auth"}
+            _publish_config_push_status(result)
+            return result
+        except Exception as err:
             _LOGGER.debug(
                 "Background fleet_telemetry_config sync check failed for %s: %s",
                 vin,
@@ -417,10 +429,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
                     vin,
                     retry_after,
                 )
-            retried_field = result.get("retried_field")
-            authorized_interval = result.get("authorized_interval")
-            if isinstance(retried_field, str) and isinstance(authorized_interval, int):
-                policy_state.authorized_interval_overrides[retried_field] = authorized_interval
+            overrides = result.get("authorized_interval_overrides")
+            if isinstance(overrides, dict):
+                for field_name, interval in overrides.items():
+                    if isinstance(field_name, str) and isinstance(interval, int):
+                        policy_state.authorized_interval_overrides[field_name] = interval
             policy_state.last_policy_key = context.policy_key
             _publish_config_push_status(result)
             _sync_key_pairing_issue(hass, entry, vin, result)

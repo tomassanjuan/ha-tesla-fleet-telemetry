@@ -11,7 +11,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.components.media_player.const import MediaPlayerState, MediaType
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
@@ -78,6 +78,15 @@ class TeslaMediaPlayer(CommandEntity, MediaPlayerEntity):
         super().__init__(coordinator, vin, proxy_client, impl, entry)
         self._attr_unique_id = telemetry_unique_id(self._vin, "media_player")
         self._optimistic_volume: float | None = None
+        # Raw MediaAudioVolume when the optimistic value was set; the optimistic
+        # value is dropped once telemetry reports a different volume.
+        self._optimistic_volume_base: object = None
+        self._position: int | None = None
+        self._position_updated_at: datetime | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._refresh_position()
 
     @property
     def available(self) -> bool:
@@ -138,18 +147,28 @@ class TeslaMediaPlayer(CommandEntity, MediaPlayerEntity):
             return None
         return duration_ms // 1000
 
-    @property
-    def media_position(self) -> int | None:
+    def _elapsed_seconds(self) -> int | None:
         elapsed_ms = self._coerce_int(self.coordinator.get_field("MediaNowPlayingElapsed"))
         if elapsed_ms is None or elapsed_ms < 0:
             return None
         return elapsed_ms // 1000
 
+    def _refresh_position(self) -> None:
+        # Stamp the position only when it changes: a fresh timestamp on every
+        # write would change the state attributes (and add a recorder row) on
+        # every unrelated telemetry update.
+        position = self._elapsed_seconds()
+        if position != self._position:
+            self._position = position
+            self._position_updated_at = dt_util.utcnow() if position is not None else None
+
+    @property
+    def media_position(self) -> int | None:
+        return self._position
+
     @property
     def media_position_updated_at(self) -> datetime | None:
-        if self.media_position is None:
-            return None
-        return dt_util.utcnow()
+        return self._position_updated_at
 
     @property
     def volume_level(self) -> float | None:
@@ -163,9 +182,26 @@ class TeslaMediaPlayer(CommandEntity, MediaPlayerEntity):
             maximum = MEDIA_PLAYER_VOLUME_MAX
         return max(0.0, min(current / maximum, 1.0))
 
+    @callback
     def _handle_coordinator_update(self) -> None:
-        self._optimistic_volume = None
+        if (
+            self._optimistic_volume is not None
+            and self.coordinator.get_field("MediaAudioVolume") != self._optimistic_volume_base
+        ):
+            self._optimistic_volume = None
+        self._refresh_position()
         super()._handle_coordinator_update()
+
+    def _volume_max(self) -> float:
+        maximum = self._coerce_float(self.coordinator.get_field("MediaAudioVolumeMax"))
+        if maximum is None or maximum <= 0:
+            maximum = MEDIA_PLAYER_VOLUME_MAX
+        return min(maximum, MEDIA_PLAYER_VOLUME_MAX)
+
+    def _set_optimistic_volume(self, level: float) -> None:
+        self._optimistic_volume = level
+        self._optimistic_volume_base = self.coordinator.get_field("MediaAudioVolume")
+        self.async_write_ha_state()
 
     # --- Commands ---
 
@@ -187,47 +223,29 @@ class TeslaMediaPlayer(CommandEntity, MediaPlayerEntity):
         """Source switching is not supported; Tesla does not expose a source-switch command."""
 
     async def async_set_volume_level(self, volume: float) -> None:
-        maximum = self._coerce_float(self.coordinator.get_field("MediaAudioVolumeMax"))
-        if maximum is None or maximum <= 0:
-            maximum = MEDIA_PLAYER_VOLUME_MAX
-        tesla_volume = round(max(0.0, min(volume * maximum, 10.0)), 1)
+        maximum = self._volume_max()
+        tesla_volume = round(max(0.0, min(volume * maximum, maximum)), 1)
         await self._send_command("adjust_volume", {"volume": tesla_volume})
-        self._optimistic_volume = volume
-        self.async_write_ha_state()
+        self._set_optimistic_volume(tesla_volume / maximum)
+
+    async def _async_step_volume(self, direction: int) -> None:
+        current = self._coerce_float(self.coordinator.get_field("MediaAudioVolume"))
+        if current is None:
+            return
+        increment = (
+            self._coerce_float(self.coordinator.get_field("MediaAudioVolumeIncrement"))
+            or MEDIA_PLAYER_VOLUME_INCREMENT
+        )
+        maximum = self._volume_max()
+        new_volume = round(max(0.0, min(current + direction * increment, maximum)), 1)
+        await self._send_command("adjust_volume", {"volume": new_volume})
+        self._set_optimistic_volume(new_volume / maximum)
 
     async def async_volume_up(self) -> None:
-        current = self._coerce_float(self.coordinator.get_field("MediaAudioVolume"))
-        increment = (
-            self._coerce_float(self.coordinator.get_field("MediaAudioVolumeIncrement"))
-            or MEDIA_PLAYER_VOLUME_INCREMENT
-        )
-        maximum = (
-            self._coerce_float(self.coordinator.get_field("MediaAudioVolumeMax"))
-            or MEDIA_PLAYER_VOLUME_MAX
-        )
-        if current is None:
-            return
-        new_volume = min(current + increment, maximum)
-        await self._send_command("adjust_volume", {"volume": round(min(new_volume, 10.0), 1)})
-        self._optimistic_volume = new_volume / maximum
-        self.async_write_ha_state()
+        await self._async_step_volume(1)
 
     async def async_volume_down(self) -> None:
-        current = self._coerce_float(self.coordinator.get_field("MediaAudioVolume"))
-        increment = (
-            self._coerce_float(self.coordinator.get_field("MediaAudioVolumeIncrement"))
-            or MEDIA_PLAYER_VOLUME_INCREMENT
-        )
-        maximum = (
-            self._coerce_float(self.coordinator.get_field("MediaAudioVolumeMax"))
-            or MEDIA_PLAYER_VOLUME_MAX
-        )
-        if current is None:
-            return
-        new_volume = max(current - increment, 0.0)
-        await self._send_command("adjust_volume", {"volume": round(min(new_volume, 10.0), 1)})
-        self._optimistic_volume = new_volume / maximum
-        self.async_write_ha_state()
+        await self._async_step_volume(-1)
 
     # --- Helpers ---
 
