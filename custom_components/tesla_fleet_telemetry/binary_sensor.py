@@ -177,7 +177,7 @@ class _DoorBinarySensorBase(
     """Shared restore-on-reload logic for DoorState-derived binary sensors."""
 
     def __init__(self, coordinator: TelemetryCoordinator) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, context=frozenset({"DoorState"}))
         self._restored_is_on: bool | None = None
 
     async def async_added_to_hass(self) -> None:

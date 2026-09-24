@@ -36,9 +36,16 @@ class TelemetryEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
         coordinator: TelemetryCoordinator,
         description: EntityDescription,
         vin: str,
+        *,
+        extra_fields: frozenset[str] = frozenset(),
     ) -> None:
-        super().__init__(coordinator)
+        """Bind the entity to its telemetry field (description.key).
+
+        The entity is only refreshed when that field or one of extra_fields
+        changes.
+        """
         self._field = description.key
+        super().__init__(coordinator, context=frozenset({self._field}) | extra_fields)
         self._vin = vin
         self._attr_unique_id = telemetry_unique_id(vin, description.key)
         self._restored_state: str | None = None

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+Added:
+
+- Battery sensors: Nominal Full Pack Energy, Lifetime Energy Charged, Lifetime Regen Energy, Brick SoC Min.
+- Software updates: the Firmware entity uses the vehicle's `SoftwareUpdateAvailable` / `SoftwareUpdateInProgress` flags when reported.
+- Remote Start Active, Sunroof, Motor Torque Command, and Rear Inverter DC Voltage sensors.
+
+Changed:
+
+- Entities refresh only when a telemetry field they read changes, instead of every entity refreshing on every telemetry burst.
+- Burst updates flush at a fixed interval, so a continuous stream can no longer delay entity updates indefinitely.
+- Commands that wake the vehicle retry as soon as telemetry reports it connected, instead of always waiting 12 seconds.
+- MQTT messages are handed to Home Assistant in batches, rather than one event-loop wakeup per message.
+
 ## 1.0.0 - 2026-05-02
 
 Initial release.

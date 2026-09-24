@@ -18,7 +18,7 @@ from .coordinator import TelemetryCoordinator
 from .entity_base import telemetry_unique_id
 from .oauth2 import TeslaOAuth2Implementation
 from .proxy_client import TeslaProxyClient
-from .utils import normalize_enum
+from .utils import coerce_bool, normalize_enum
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,13 +114,33 @@ class TeslaFirmwareUpdate(CommandEntity, UpdateEntity):
         return _RELEASE_NOTES_BASE_URL.format(version=version)
 
     @property
+    def _update_available_flag(self) -> bool | None:
+        """SoftwareUpdateAvailable, or None on firmware that doesn't report it."""
+        return coerce_bool(self.coordinator.get_field("SoftwareUpdateAvailable"))
+
+    @property
+    def _update_in_progress_flag(self) -> bool | None:
+        """SoftwareUpdateInProgress, or None on firmware that doesn't report it."""
+        return coerce_bool(self.coordinator.get_field("SoftwareUpdateInProgress"))
+
+    @property
     def _update_pending(self) -> bool:
+        if self._update_in_progress_flag:
+            return True
+        if self._update_available_flag is False:
+            # The vehicle reports no update; SoftwareUpdateVersion can linger
+            # with a stale value after an install.
+            return False
         available = _normalize_version(self.coordinator.get_field("SoftwareUpdateVersion"))
         return available is not None and available != self.installed_version
 
     @property
     def in_progress(self) -> bool:
         """Show update in progress while downloading or installing."""
+        # Prefer the vehicle's explicit flag when this firmware reports it.
+        in_progress_flag = self._update_in_progress_flag
+        if in_progress_flag is not None:
+            return in_progress_flag
         # Progress fields keep reporting 0 when no update is pending; without
         # this gate the entity would sit "in progress" indefinitely.
         if not self._update_pending:
@@ -163,6 +183,10 @@ class TeslaFirmwareUpdate(CommandEntity, UpdateEntity):
         scheduled_start = self.coordinator.get_field("SoftwareUpdateScheduledStartTime")
         if scheduled_start is not None:
             attrs["scheduled_start_time"] = scheduled_start
+        if self._update_available_flag is not None:
+            attrs["update_available"] = self._update_available_flag
+        if self._update_in_progress_flag is not None:
+            attrs["update_in_progress"] = self._update_in_progress_flag
         return attrs
 
     @property

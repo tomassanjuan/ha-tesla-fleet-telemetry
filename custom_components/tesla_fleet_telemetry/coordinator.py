@@ -38,6 +38,7 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._field_events: dict[str, asyncio.Event] = {}
         self._last_alert_timestamp: str | None = None
         self._notify_handle: asyncio.TimerHandle | None = None
+        self._dirty_fields: set[str] = set()
         self._unknown_fields_logged: set[str] = set()
         # Seed data so coordinator is not None before first MQTT message
         self.data = {}
@@ -59,7 +60,10 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # their restored state for the latter).
         if field in self.data and self.data[field] == value:
             return
-        self.data = {**self.data, field: value}
+        # Mutate in place: copying the whole field dict on every MQTT message
+        # is O(fields) per update and nothing holds on to a previous snapshot.
+        self.data[field] = value
+        self._dirty_fields.add(field)
         if value is not None:
             self._field_events.setdefault(field, asyncio.Event()).set()
         self._notify_field_listeners(field, value)
@@ -71,28 +75,49 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @callback
     def _schedule_coordinator_update(self) -> None:
-        """Notify coordinator listeners once for a burst of field changes."""
-        if self._notify_handle is not None:
-            self._notify_handle.cancel()
-        self._notify_handle = self.hass.loop.call_later(
-            _BURST_DEBOUNCE_SECONDS, self._flush_coordinator_update
-        )
+        """Notify coordinator listeners once for a burst of field changes.
+
+        The first change of a burst arms the timer and later changes ride along,
+        rather than re-arming it: with a continuous stream (realtime mode) a
+        trailing debounce could keep postponing the flush indefinitely.
+        """
+        if self._notify_handle is None:
+            self._notify_handle = self.hass.loop.call_later(
+                _BURST_DEBOUNCE_SECONDS, self._flush_coordinator_update
+            )
 
     @callback
     def _flush_coordinator_update(self) -> None:
         self._notify_handle = None
+        dirty, self._dirty_fields = self._dirty_fields, set()
         self.last_update_success = True
-        self.async_update_listeners()
+        self._async_notify_listeners(dirty)
 
     @callback
     def async_update_listeners(self) -> None:
-        """Update all listeners, isolating failures to the entity that raised.
+        """Update all listeners, isolating failures to the entity that raised."""
+        self._async_notify_listeners(None)
+
+    @callback
+    def _async_notify_listeners(self, changed_fields: set[str] | None) -> None:
+        """Update listeners affected by changed_fields (all listeners when None).
+
+        Entities register the telemetry fields they read as their listener
+        context (a frozenset); those whose fields did not change are skipped so
+        a burst of a few fields doesn't rewrite the state of every entity.
+        Listeners without a field-set context are always updated.
 
         The base implementation stops at the first listener that raises, so one
         entity rejecting a telemetry value (e.g. HA's sensor state validation)
         would silently freeze every entity registered after it.
         """
-        for update_callback, _ in list(self._listeners.values()):
+        for update_callback, context in list(self._listeners.values()):
+            if (
+                changed_fields is not None
+                and isinstance(context, frozenset)
+                and context.isdisjoint(changed_fields)
+            ):
+                continue
             try:
                 update_callback()
             except Exception:
@@ -104,6 +129,7 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._notify_handle is not None:
             self._notify_handle.cancel()
             self._notify_handle = None
+        self._dirty_fields.clear()
 
     async def async_shutdown(self) -> None:
         """Cancel delayed listener updates during entry unload."""
@@ -177,9 +203,8 @@ class TelemetryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         started_at = str(started_at)
         if self._last_alert_timestamp is None or started_at > self._last_alert_timestamp:
             self._last_alert_timestamp = started_at
-            values = dict(self.data)
-            values["LastAlertTriggered"] = alert_code
-            self.data = values
+            self.data["LastAlertTriggered"] = alert_code
+            self._dirty_fields.add("LastAlertTriggered")
             self._notify_field_listeners("LastAlertTriggered", alert_code)
             self._schedule_coordinator_update()
 

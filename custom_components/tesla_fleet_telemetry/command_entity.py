@@ -8,6 +8,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     HomeAssistantError,
@@ -17,7 +18,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import WAKE_UP_RETRY_DELAY_SECONDS
+from .const import WAKE_UP_CONNECTED_SETTLE_SECONDS, WAKE_UP_RETRY_DELAY_SECONDS
 from .coordinator import TelemetryCoordinator
 from .device import build_device_info
 from .oauth2 import TeslaOAuth2Implementation, async_get_valid_access_token
@@ -92,6 +93,37 @@ class CommandEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
             return True
         return self._restored_available
 
+    async def _wake_and_wait_connected(self, access_token: str) -> None:
+        """Wake the vehicle and wait until telemetry reports it connected.
+
+        Returns as soon as ConnectivityStatus transitions to Connected (plus a
+        short settle delay), falling back to WAKE_UP_RETRY_DELAY_SECONDS when
+        telemetry doesn't report the transition — the previous fixed wait.
+        """
+        connected: asyncio.Future[None] = self.hass.loop.create_future()
+
+        @callback
+        def _on_connectivity(_field: str, value: Any) -> None:
+            if not connected.done() and str(value).lower() == "connected":
+                connected.set_result(None)
+
+        # Subscribe before waking so a fast transition is not missed.
+        remove_listener = self.coordinator.async_add_field_listener(
+            "ConnectivityStatus", _on_connectivity
+        )
+        try:
+            try:
+                await self._proxy_client.wake_vehicle(access_token)
+            except Exception as e:  # noqa: S110
+                _LOGGER.debug("Wake-up command failed for %s: %s", self._vin, e)
+            try:
+                await asyncio.wait_for(connected, timeout=WAKE_UP_RETRY_DELAY_SECONDS)
+            except TimeoutError:
+                return
+            await asyncio.sleep(WAKE_UP_CONNECTED_SETTLE_SECONDS)
+        finally:
+            remove_listener()
+
     async def _get_token(self) -> str:
         """Return a valid access token, refreshing if needed.
 
@@ -150,11 +182,7 @@ class CommandEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
                     self._vin,
                     endpoint,
                 )
-                try:
-                    await self._proxy_client.wake_vehicle(access_token)
-                except Exception as e:  # noqa: S110
-                    _LOGGER.debug("Wake-up command failed for %s: %s", self._vin, e)
-                await asyncio.sleep(WAKE_UP_RETRY_DELAY_SECONDS)
+                await self._wake_and_wait_connected(access_token)
                 return await self._send_command(endpoint, body, _retrying=True)
             if "public key" in msg and "not been paired" in msg:
                 raise ServiceValidationError(
