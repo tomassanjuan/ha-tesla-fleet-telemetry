@@ -20,11 +20,13 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DESCRIPTIONS,
     DOMAIN,
-    TelemetryEntityDescription,
 )
 from .coordinator import TelemetryCoordinator
+from .descriptions import (
+    DESCRIPTIONS,
+    TelemetryEntityDescription,
+)
 from .device import build_device_info
 from .entity_base import TelemetryEntity, telemetry_unique_id
 from .fleet_config import PolicyState

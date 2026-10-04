@@ -17,11 +17,13 @@ from custom_components.tesla_fleet_telemetry.binary_sensor import TelemetryBinar
 from custom_components.tesla_fleet_telemetry.command_entity import CommandEntity
 from custom_components.tesla_fleet_telemetry.const import (
     DOMAIN,
+)
+from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
+from custom_components.tesla_fleet_telemetry.descriptions import (
     ENTITY_FIELD_MAPPINGS,
     FIELD_DEFS,
     SUPPORTED_STREAMING_FIELDS,
 )
-from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
 from custom_components.tesla_fleet_telemetry.mqtt_client import TeslaMQTTClient
 from custom_components.tesla_fleet_telemetry.update import TeslaFirmwareUpdate
 

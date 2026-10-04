@@ -12,11 +12,13 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_VIN,
-    DERIVED_SENSOR_UNIQUE_ID_SUFFIXES,
     DEVICE_METADATA_FIELDS,
+    MIN_AUTOMATIC_PUSH_INTERVAL_SECONDS,
+)
+from .descriptions import (
+    DERIVED_SENSOR_UNIQUE_ID_SUFFIXES,
     ENTITY_FIELD_MAPPINGS,
     FIELD_DEFS,
-    MIN_AUTOMATIC_PUSH_INTERVAL_SECONDS,
     SUPPORTED_STREAMING_FIELDS,
 )
 

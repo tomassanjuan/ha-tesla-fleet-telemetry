@@ -22,9 +22,11 @@ from .const import (
     DEFAULT_TELEMETRY_DELIVERY_POLICY,
     DEFAULT_TELEMETRY_MODE,
     DOMAIN,
-    FIELD_DEFS,
     FLEET_CONFIG_SYNC_DELAYS_SECONDS,
     FLEET_TELEMETRY_ERROR_LOG_LIMIT,
+)
+from .descriptions import (
+    FIELD_DEFS,
     SUPPORTED_STREAMING_FIELDS,
 )
 from .policy import (

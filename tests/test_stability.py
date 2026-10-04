@@ -18,10 +18,12 @@ from custom_components.tesla_fleet_telemetry.const import (
     CONF_MQTT_PORT,
     CONF_PROXY_URL,
     CONF_VIN,
-    DESCRIPTIONS,
     DOMAIN,
 )
 from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
+from custom_components.tesla_fleet_telemetry.descriptions import (
+    DESCRIPTIONS,
+)
 from custom_components.tesla_fleet_telemetry.fleet_config import _build_push_result
 from custom_components.tesla_fleet_telemetry.mqtt_client import TeslaMQTTClient, _parse_value
 from custom_components.tesla_fleet_telemetry.number import ChargeLimitNumber

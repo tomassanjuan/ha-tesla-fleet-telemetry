@@ -18,13 +18,15 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DOMAIN,
+)
+from .coordinator import TelemetryCoordinator
+from .descriptions import (
     DERIVED_SENSOR_DESCRIPTIONS,
     DESCRIPTIONS,
-    DOMAIN,
     DerivedSensorEntityDescription,
     TelemetryEntityDescription,
 )
-from .coordinator import TelemetryCoordinator
 from .device import build_device_info
 from .entity_base import TelemetryEntity, telemetry_unique_id
 from .fleet_config import PolicyState
