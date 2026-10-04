@@ -5,7 +5,7 @@ CI config. Follows `DEFECT_LIST.md` and `AUDIT_WAVE2.md`; issues already covered
 are not repeated.
 
 Validation: the full suite (75 tests: the 66 existing plus 9 new in
-`tests/test_audit_regressions.py`) passes, and pre-commit (ruff, ruff-format, mypy,
+`tests/test_audit_regressions.py`, now `tests/test_push_and_entity_regressions.py`) passes, and pre-commit (ruff, ruff-format, mypy,
 JSON/YAML checks), `validate_files.py` and yamllint are clean. All 9 new tests fail
 against the pre-fix code.
 
@@ -41,7 +41,7 @@ against the pre-fix code.
 | 21 | **Manual pushes bypassed the 30 s throttle.** | The throttle now covers every reason and reports "throttled, retry in Ns". *Reload Telemetry Data* deletes and then pushes, so it passes `force=True` to avoid leaving the vehicle with no config. |
 | 22 | Docs claimed a PEM certificate could be pasted manually, but no such field exists. | `SETUP.md`/`TROUBLESHOOTING.md` corrected. The renewal section now describes the automatic re-check. |
 
-Tests: `tests/test_audit_wave4.py` covers region detection, full-chain vs leaf-only CA
+Tests: `tests/test_audit_wave4.py` (now `tests/test_connectivity.py`) covers region detection, full-chain vs leaf-only CA
 fetch (against a local TLS server with a generated CA → leaf chain), and MQTT
 credential, TLS and client-id wiring.
 

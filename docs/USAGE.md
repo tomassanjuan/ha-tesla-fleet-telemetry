@@ -121,6 +121,72 @@ Useful examples:
 
 Keep automations conservative. A good Tesla automation should check vehicle location, current state, and recent command history before acting.
 
+### Examples
+
+Entity IDs below assume the vehicle device is named `My Tesla`; replace `my_tesla` with your device's slug (see **Settings > Devices & services > Entities**).
+
+Notify when the car is left unlocked at home after 22:00:
+
+```yaml
+automation:
+  - alias: "Tesla unlocked at night"
+    triggers:
+      - trigger: time
+        at: "22:00:00"
+    conditions:
+      - condition: state
+        entity_id: lock.my_tesla_lock
+        state: unlocked
+      - condition: zone
+        entity_id: device_tracker.my_tesla_location
+        zone: zone.home
+    actions:
+      - action: notify.notify
+        data:
+          message: "The Tesla is unlocked at home."
+```
+
+Warn when the battery drops below 20% while unplugged:
+
+```yaml
+automation:
+  - alias: "Tesla low battery"
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.my_tesla_battery_level
+        below: 20
+    conditions:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: sensor.my_tesla_charge_state_detailed
+            state: Charging
+    actions:
+      - action: notify.notify
+        data:
+          message: "Tesla battery is at {{ states('sensor.my_tesla_battery_level') }}%."
+```
+
+Precondition the cabin on weekday mornings while parked at home:
+
+```yaml
+automation:
+  - alias: "Tesla weekday preconditioning"
+    triggers:
+      - trigger: time
+        at: "07:30:00"
+    conditions:
+      - condition: time
+        weekday: [mon, tue, wed, thu, fri]
+      - condition: zone
+        entity_id: device_tracker.my_tesla_location
+        zone: zone.home
+    actions:
+      - action: climate.turn_on
+        target:
+          entity_id: climate.my_tesla_climate
+```
+
 ## Maintenance
 
 Weekly:
