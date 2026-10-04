@@ -12,7 +12,6 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util.ssl import client_context
-from tesla_fleet_api.const import Method
 from tesla_fleet_api.exceptions import (
     DeviceUnexpectedResponse,
     Forbidden,
@@ -22,8 +21,10 @@ from tesla_fleet_api.exceptions import (
     OAuthExpired,
     PaymentRequired,
     RateLimited,
+    ResponseError,
     TeslaFleetError,
     VehicleOffline,
+    raise_for_status,
 )
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 from tesla_fleet_api.tesla.vehicle.fleet import VehicleFleet
@@ -41,6 +42,17 @@ _LOGGER = logging.getLogger(__name__)
 _INSECURE_SSL = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 _INSECURE_SSL.check_hostname = False
 _INSECURE_SSL.verify_mode = ssl.CERT_NONE
+
+
+# Errors a proxy request can surface once Fleet API errors are mapped: mapped
+# HomeAssistantErrors, transport failures, and RuntimeError when not set up yet.
+PROXY_REQUEST_ERRORS: tuple[type[Exception], ...] = (
+    HomeAssistantError,
+    aiohttp.ClientError,
+    TimeoutError,
+    OSError,
+    RuntimeError,
+)
 
 
 class RateLimitedError(HomeAssistantError):
@@ -201,6 +213,7 @@ class TeslaProxyClient:
         self._api: TeslaFleetApi | None = None
         self._vehicle: VehicleFleet | None = None
         self._wake_task: asyncio.Task[dict] | None = None
+        self._access_token: str = ""
 
     async def async_setup(self) -> None:
         """Create the shared HTTP session and Fleet API client pointed at the proxy."""
@@ -218,6 +231,7 @@ class TeslaProxyClient:
             energy_scope=False,
             partner_scope=False,
             user_scope=False,
+            access_token=self._get_access_token,
         )
         self._vehicle = self._api.vehicles.createFleet(self._vin)
 
@@ -262,7 +276,7 @@ class TeslaProxyClient:
                 try:
                     await self.proxy_fleet_telemetry_get(access_token)
                     _LOGGER.debug("Proxy API health check passed (config fetch successful)")
-                except Exception as err:
+                except PROXY_REQUEST_ERRORS as err:
                     # Auth errors or proxy errors — log but don't fail
                     err_msg = str(err)[:100]
                     _LOGGER.debug("Proxy API health check failed: %s", err_msg)
@@ -276,10 +290,33 @@ class TeslaProxyClient:
             _LOGGER.debug("Proxy health check skipped (session not ready yet)")
             return True  # Don't report as failure since it's not a proxy issue
 
+    async def _get_access_token(self) -> str:
+        """Token provider passed to TeslaFleetApi (public callable hook)."""
+        return self._access_token
+
     def _set_token(self, access_token: str) -> None:
-        if self._api is not None:
-            # TODO: Replace private API access with public methods once tesla-fleet-api v2+ provides them
-            self._api._access_token = access_token
+        self._access_token = access_token
+
+    async def _raw_request(
+        self, method: str, path: str, json: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Send a request to an endpoint tesla-fleet-api has no typed wrapper for.
+
+        Uses the shared session and the library's public ``raise_for_status``
+        so error mapping matches the typed methods.
+        """
+        if self._session is None:
+            raise RuntimeError("Session not initialized in _raw_request")
+        headers = {"Authorization": f"Bearer {self._access_token}"}
+        if json is not None:
+            json = {k: v for k, v in json.items() if v is not None}
+        async with self._session.request(
+            method, f"{self._proxy_url}/{path}", headers=headers, json=json
+        ) as resp:
+            await raise_for_status(resp)
+            if not resp.content_type.lower().startswith("application/json"):
+                raise ResponseError(status=resp.status, data=await resp.text())
+            return cast(dict[str, Any], await resp.json())
 
     async def _dispatch_command(  # noqa: C901
         self, endpoint: str, body: dict[str, Any]
@@ -289,11 +326,8 @@ class TeslaProxyClient:
         Falls back to a raw POST for any endpoint not explicitly listed.
         """
         v = self._vehicle
-        a = self._api
         if v is None:
             raise RuntimeError("Vehicle not initialized in _dispatch_command")
-        if a is None:
-            raise RuntimeError("API not initialized in _dispatch_command")
         match endpoint:
             case "actuate_trunk":
                 which_trunk = body.get("which_trunk")
@@ -369,8 +403,8 @@ class TeslaProxyClient:
                 # passthrough instead, using Tesla's documented wire-format values.
                 return cast(
                     dict[str, Any],
-                    await a._request(
-                        Method.POST,
+                    await self._raw_request(
+                        "POST",
                         f"{FLEET_API_VERSION}/vehicles/{self._vin}/command/{endpoint}",
                         json=body,
                     ),
@@ -438,11 +472,10 @@ class TeslaProxyClient:
                     await v.window_control(body["command"], body.get("lat"), body.get("lon")),
                 )
             case _:
-                # TODO: Use public API methods once tesla-fleet-api exposes command endpoints
                 return cast(
                     dict[str, Any],
-                    await a._request(
-                        Method.POST,
+                    await self._raw_request(
+                        "POST",
                         f"{FLEET_API_VERSION}/vehicles/{self._vin}/command/{endpoint}",
                         json=body,
                     ),
@@ -553,13 +586,8 @@ class TeslaProxyClient:
         self._check_ready()
         self._set_token(access_token)
         try:
-            # TODO: Use public API methods once tesla-fleet-api exposes telemetry endpoints
-            return cast(
-                dict[str, Any],
-                await self._api._request(  # type: ignore[union-attr]
-                    Method.GET,
-                    f"{FLEET_API_VERSION}/vehicles/{self._vin}/fleet_telemetry_errors",
-                ),
+            return await self._raw_request(
+                "GET", f"{FLEET_API_VERSION}/vehicles/{self._vin}/fleet_telemetry_errors"
             )
         except TeslaFleetError as err:
             raise _map_fleet_exception(err) from err

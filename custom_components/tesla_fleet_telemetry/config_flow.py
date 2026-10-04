@@ -8,10 +8,12 @@ import logging
 from typing import Any, cast
 from urllib.parse import urlparse
 
+import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
@@ -19,6 +21,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from tesla_fleet_api.exceptions import TeslaFleetError
 
 from .const import (
     CONF_CLIENT_ID,
@@ -58,7 +61,7 @@ from .oauth2 import (
     async_get_valid_access_token,
     async_register_partner_domain,
 )
-from .proxy_client import TeslaProxyClient
+from .proxy_client import PROXY_REQUEST_ERRORS, TeslaProxyClient
 from .utils import (
     async_fetch_server_ca,
     extract_first_fields_config,
@@ -66,6 +69,15 @@ from .utils import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Failures a Tesla Fleet API call can surface: wrapped HomeAssistantErrors,
+# unwrapped library errors, and transport failures.
+_TESLA_HTTP_ERRORS: tuple[type[BaseException], ...] = (
+    HomeAssistantError,
+    TeslaFleetError,
+    aiohttp.ClientError,
+    TimeoutError,
+)
 
 
 async def _async_verify_mqtt_reachable(
@@ -194,7 +206,7 @@ async def _maybe_autofetch_ca(
 
     try:
         pem, hostname_ok = await async_fetch_server_ca(hass, hostname, port)
-    except Exception as err:
+    except (OSError, ValueError) as err:
         _LOGGER.debug("CA auto-fetch failed for %s:%s: %s", hostname, port, err)
         errors[CONF_TELEMETRY_SERVER_CA] = "ca_fetch_failed"
         return user_input
@@ -421,7 +433,7 @@ async def _async_try_partner_registration(
         # Partner tokens and registrations are per region: use the account's host.
         token = await async_fetch_partner_token(hass, client_id, client_secret, api_base)
         _LOGGER.debug("Partner token obtained for domain: %s", domain)
-    except Exception as err:
+    except _TESLA_HTTP_ERRORS as err:
         _LOGGER.warning(
             "Could not obtain partner token for domain registration of %s: %s",
             domain,
@@ -439,7 +451,7 @@ async def _async_try_partner_registration(
             err,
         )
         return ("partner_register_failed", str(err))
-    except Exception as err:
+    except _TESLA_HTTP_ERRORS as err:
         _LOGGER.warning(
             "Tesla partner domain registration failed (transient) for %s: %s",
             domain,
@@ -450,7 +462,7 @@ async def _async_try_partner_registration(
     try:
         await async_check_partner_public_key(hass, token, domain, api_base)
         _LOGGER.info("Partner public key verified for domain: %s", domain)
-    except Exception as err:
+    except _TESLA_HTTP_ERRORS as err:
         _LOGGER.warning(
             "Partner public key check failed for %s (registration may still be pending): %s",
             domain,
@@ -655,7 +667,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
         try:
             pem, hostname_ok = await async_fetch_server_ca(self.hass, hostname, port)
             ca = normalize_pem_cert_bundle(pem)
-        except Exception as err:
+        except (OSError, ValueError) as err:
             _LOGGER.debug("CA auto-fetch failed for %s:%s: %s", hostname, port, err)
             return self.async_show_form(
                 step_id="connection",
@@ -787,7 +799,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                     step_id="reauth_confirm",
                     errors={"base": "invalid_auth"},
                 )
-            except Exception as err:
+            except _TESLA_HTTP_ERRORS as err:
                 # Non-auth error (network, 5xx) — proceed and let the integration retry
                 _LOGGER.debug("Reauth VIN validation skipped due to transient error: %s", err)
             if reauth_vins is not None and self.reauth_entry.data[CONF_VIN] not in reauth_vins:
@@ -812,7 +824,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             vins, self._fleet_api_base = await async_fetch_available_vins(
                 self.hass, token["access_token"]
             )
-        except Exception as err:
+        except _TESLA_HTTP_ERRORS as err:
             _LOGGER.error("Failed to fetch VINs from Fleet API: %s", err)
             return self.async_abort(reason="vin_fetch_failed")
 
@@ -906,7 +918,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             existing_config = extract_first_fields_config(payload)
             if isinstance(existing_config, dict):
                 self._existing_car_telemetry_config = existing_config
-        except Exception as err:
+        except PROXY_REQUEST_ERRORS as err:
             _LOGGER.debug("Unable to fetch existing fleet telemetry config for %s: %s", vin, err)
 
         # Build telemetry input from settings already gathered in step 1.
@@ -1189,7 +1201,7 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
             self._existing_car_telemetry_config = (
                 await self._async_fetch_existing_car_telemetry_config()
             )
-        except Exception as err:
+        except PROXY_REQUEST_ERRORS as err:
             _LOGGER.debug(
                 "Unable to fetch existing fleet telemetry config for options flow: %s",
                 err,

@@ -22,7 +22,12 @@ from .const import WAKE_UP_CONNECTED_SETTLE_SECONDS, WAKE_UP_RETRY_DELAY_SECONDS
 from .coordinator import TelemetryCoordinator
 from .device import build_device_info
 from .oauth2 import TeslaOAuth2Implementation, async_get_valid_access_token
-from .proxy_client import RateLimitedError, TeslaProxyClient, TokenRevokedError
+from .proxy_client import (
+    PROXY_REQUEST_ERRORS,
+    RateLimitedError,
+    TeslaProxyClient,
+    TokenRevokedError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,7 +119,7 @@ class CommandEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
         try:
             try:
                 await self._proxy_client.wake_vehicle(access_token)
-            except Exception as e:  # noqa: S110
+            except PROXY_REQUEST_ERRORS as e:
                 _LOGGER.debug("Wake-up command failed for %s: %s", self._vin, e)
             try:
                 await asyncio.wait_for(connected, timeout=WAKE_UP_RETRY_DELAY_SECONDS)

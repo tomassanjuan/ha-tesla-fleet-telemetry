@@ -53,18 +53,17 @@ async def test_seat_and_wheel_commands_use_json_passthrough(endpoint: str, body:
     """The signed Vehicle Command Protocol wrapper methods (tesla-fleet-api's
     `v.remote_seat_heater_request()` etc.) were rejected by some vehicles with
     InvalidRequest/InvalidCommand. These endpoints must instead be posted as
-    plain JSON through the proxy's REST passthrough (`a._request`), not built
+    plain JSON through the proxy's REST passthrough (`_raw_request`), not built
     as a signed protobuf command via the wrapper.
     """
     client = TeslaProxyClient.__new__(TeslaProxyClient)
     client._vin = TEST_VIN
     client._vehicle = MagicMock()
-    client._api = MagicMock()
-    client._api._request = AsyncMock(return_value={"response": {"result": True}})
+    client._raw_request = AsyncMock(return_value={"response": {"result": True}})
 
     await client._dispatch_command(endpoint, body)
 
-    client._api._request.assert_awaited_once_with(
+    client._raw_request.assert_awaited_once_with(
         "POST", f"{FLEET_API_VERSION}/vehicles/{TEST_VIN}/command/{endpoint}", json=body
     )
     assert client._vehicle.method_calls == []

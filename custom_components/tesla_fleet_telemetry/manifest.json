@@ -11,7 +11,7 @@
   "requirements": [
     "paho-mqtt>=2.1.0",
     "qrcode[png]>=8.2",
-    "tesla-fleet-api>=1.7.5"
+    "tesla-fleet-api>=1.17.2,<2"
   ],
   "version": "1.0.0"
 }

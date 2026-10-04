@@ -1,7 +1,7 @@
 # Architecture — Tesla Fleet Telemetry (Home Assistant integration)
 
 This documents the as-built design after the 2026-07-12 audit/fix pass (see
-`DEFECT_LIST.md`). The architecture itself was already sound; this file records the
+`dev/DEFECT_LIST.md`). The architecture itself was already sound; this file records the
 design decisions so they don't need to be re-derived from the code.
 
 ## Domain & manifest
