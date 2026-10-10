@@ -17,9 +17,14 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.tesla_fleet_telemetry.binary_sensor import TelemetryBinarySensor
-from custom_components.tesla_fleet_telemetry.const import DESCRIPTIONS, DOMAIN
+from custom_components.tesla_fleet_telemetry.const import (
+    DOMAIN,
+)
 from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
 from custom_components.tesla_fleet_telemetry.cover import TeslaChargePortCover
+from custom_components.tesla_fleet_telemetry.descriptions import (
+    DESCRIPTIONS,
+)
 from custom_components.tesla_fleet_telemetry.device_tracker import TeslaLocationTracker
 from custom_components.tesla_fleet_telemetry.lock import TeslaVehicleLock
 from custom_components.tesla_fleet_telemetry.number import ChargeLimitNumber

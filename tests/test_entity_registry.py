@@ -11,7 +11,10 @@ immediately if that shape or its parsing ever drift apart again.
 
 from __future__ import annotations
 
-from custom_components.tesla_fleet_telemetry.const import ENTITY_FIELD_MAPPINGS, FIELD_DEFS
+from custom_components.tesla_fleet_telemetry.descriptions import (
+    ENTITY_FIELD_MAPPINGS,
+    FIELD_DEFS,
+)
 from custom_components.tesla_fleet_telemetry.entity_base import telemetry_unique_id
 from custom_components.tesla_fleet_telemetry.entity_registry import (
     _default_enabled_for_unique_id,

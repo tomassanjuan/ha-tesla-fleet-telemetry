@@ -11,7 +11,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, FIELD_DEFS, TPMS_WHEEL_FIELDS
+from .const import (
+    DOMAIN,
+)
+from .descriptions import (
+    FIELD_DEFS,
+    TPMS_WHEEL_FIELDS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

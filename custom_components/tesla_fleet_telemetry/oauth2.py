@@ -12,14 +12,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from tesla_fleet_api.const import Method, Scope
+from tesla_fleet_api.const import Scope
 from tesla_fleet_api.exceptions import Forbidden, InvalidRequest, LibraryError, TeslaFleetError
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 
 from .const import (
     DOMAIN,
     FLEET_API_BASE,
-    FLEET_API_VERSION,
     OAUTH_AUTHORIZE_URL,
     OAUTH_SCOPES,
     OAUTH_TOKEN_URL,
@@ -205,7 +204,7 @@ async def async_fetch_partner_token(
         result = await api.partner_login(client_id, client_secret, scopes=_PARTNER_SCOPES)
     except TeslaFleetError as err:
         raise HomeAssistantError(f"Partner token request failed: {err}") from err
-    except Exception as err:
+    except (aiohttp.ClientError, TimeoutError) as err:
         raise HomeAssistantError(f"Partner token request failed: {err}") from err
 
     token = result.get("access_token")
@@ -274,7 +273,7 @@ async def async_fetch_available_vins(
         energy_scope=False,
         partner_scope=False,
         user_scope=True,
-        vehicle_scope=False,
+        vehicle_scope=True,
     )
     try:
         try:
@@ -282,7 +281,8 @@ async def async_fetch_available_vins(
         except LibraryError:
             # No region answered for this account; fall back to the default host.
             api.server = FLEET_API_BASE
-        payload = await api._request(Method.GET, f"{FLEET_API_VERSION}/vehicles")
+        # The account-wide vehicle list is exposed on VehicleFleet; the VIN is unused.
+        payload = await api.vehicles.createFleet("").list()
     except TeslaFleetError as err:
         if err.status in (401, 403):
             raise TeslaAuthError(f"Tesla rejected the access token: {err}") from err

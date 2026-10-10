@@ -21,13 +21,15 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.tesla_fleet_telemetry.binary_sensor import TelemetryBinarySensor
 from custom_components.tesla_fleet_telemetry.const import (
-    DESCRIPTIONS,
     DOMAIN,
-    SUPPORTED_STREAMING_FIELDS,
-    TPMS_WHEEL_FIELDS,
 )
 from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
 from custom_components.tesla_fleet_telemetry.cover import _window_is_open
+from custom_components.tesla_fleet_telemetry.descriptions import (
+    DESCRIPTIONS,
+    SUPPORTED_STREAMING_FIELDS,
+    TPMS_WHEEL_FIELDS,
+)
 from custom_components.tesla_fleet_telemetry.entity_registry import _fields_for_unique_id
 from custom_components.tesla_fleet_telemetry.mqtt_client import _parse_value
 from custom_components.tesla_fleet_telemetry.repairs import UnknownFieldRepairFlow

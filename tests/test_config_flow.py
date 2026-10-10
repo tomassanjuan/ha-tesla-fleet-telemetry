@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.tesla_fleet_telemetry.config_flow import (
-    _parse_mqtt_endpoint,
-    _parse_telemetry_endpoint,
+from custom_components.tesla_fleet_telemetry.flow_helpers import (
+    parse_mqtt_endpoint,
+    parse_telemetry_endpoint,
 )
 
 
@@ -26,7 +26,7 @@ from custom_components.tesla_fleet_telemetry.config_flow import (
     ],
 )
 def test_parse_mqtt_endpoint_success(endpoint: str, expected_host: str, expected_port: int) -> None:
-    host, port = _parse_mqtt_endpoint(endpoint)
+    host, port = parse_mqtt_endpoint(endpoint)
     assert (host, port) == (expected_host, expected_port)
 
 
@@ -36,20 +36,20 @@ def test_parse_mqtt_endpoint_success(endpoint: str, expected_host: str, expected
 )
 def test_parse_mqtt_endpoint_failure(endpoint: str) -> None:
     with pytest.raises(ValueError):
-        _parse_mqtt_endpoint(endpoint)
+        parse_mqtt_endpoint(endpoint)
 
 
 def test_parse_telemetry_endpoint_https_url() -> None:
-    host, port = _parse_telemetry_endpoint("https://telemetry.example.com:443")
+    host, port = parse_telemetry_endpoint("https://telemetry.example.com:443")
     assert host == "telemetry.example.com"
     assert port == 443
 
 
 def test_parse_telemetry_endpoint_rejects_empty() -> None:
     with pytest.raises(ValueError):
-        _parse_telemetry_endpoint("")
+        parse_telemetry_endpoint("")
 
 
 def test_parse_telemetry_endpoint_rejects_non_https_scheme() -> None:
     with pytest.raises(ValueError):
-        _parse_telemetry_endpoint("http://telemetry.example.com")
+        parse_telemetry_endpoint("http://telemetry.example.com")

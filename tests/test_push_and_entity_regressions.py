@@ -1,4 +1,4 @@
-"""Regression tests for the second full-repo audit's fixes."""
+"""Regression tests for fleet config push retries and entity command/state fixes."""
 
 from __future__ import annotations
 

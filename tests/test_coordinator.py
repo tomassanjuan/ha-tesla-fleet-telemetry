@@ -9,8 +9,13 @@ import pytest
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.tesla_fleet_telemetry.const import DOMAIN, FIELD_DEFS
+from custom_components.tesla_fleet_telemetry.const import (
+    DOMAIN,
+)
 from custom_components.tesla_fleet_telemetry.coordinator import TelemetryCoordinator
+from custom_components.tesla_fleet_telemetry.descriptions import (
+    FIELD_DEFS,
+)
 
 from .conftest import TEST_VIN
 

@@ -12,11 +12,13 @@ from .const import (
     DEFAULT_RESEND_INTERVAL_SECONDS,
     DEFAULT_TELEMETRY_MODE,
     DEVICE_METADATA_FIELDS,
-    FIELD_DEFS,
-    LOCATION_FIELDS,
     RUNTIME_INTERVAL_OVERRIDES,
     STATIC_METADATA_INTERVAL_SECONDS,
     TelemetryMode,
+)
+from .descriptions import (
+    FIELD_DEFS,
+    LOCATION_FIELDS,
 )
 from .polling_profiles import INSTANT_FIELDS, POLLING_PROFILES, field_group_for_desc
 

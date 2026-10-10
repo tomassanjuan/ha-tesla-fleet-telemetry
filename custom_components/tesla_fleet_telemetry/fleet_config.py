@@ -22,9 +22,11 @@ from .const import (
     DEFAULT_TELEMETRY_DELIVERY_POLICY,
     DEFAULT_TELEMETRY_MODE,
     DOMAIN,
-    FIELD_DEFS,
     FLEET_CONFIG_SYNC_DELAYS_SECONDS,
     FLEET_TELEMETRY_ERROR_LOG_LIMIT,
+)
+from .descriptions import (
+    FIELD_DEFS,
     SUPPORTED_STREAMING_FIELDS,
 )
 from .policy import (
@@ -32,7 +34,12 @@ from .policy import (
     default_field_policy,
     extract_unsupported_interval,
 )
-from .proxy_client import RateLimitedError, TeslaProxyClient, TokenRevokedError
+from .proxy_client import (
+    PROXY_REQUEST_ERRORS,
+    RateLimitedError,
+    TeslaProxyClient,
+    TokenRevokedError,
+)
 from .utils import normalize_pem_cert_bundle
 
 _LOGGER = logging.getLogger(__name__)
@@ -340,7 +347,7 @@ async def _log_fleet_telemetry_errors(
         raise ConfigEntryAuthFailed(
             "Tesla OAuth token was revoked — re-authentication required"
         ) from err
-    except Exception as err:
+    except PROXY_REQUEST_ERRORS as err:
         _LOGGER.debug("Unable to read fleet_telemetry_errors for %s: %s", vin, err)
         return
 
@@ -548,7 +555,7 @@ async def _wait_for_fleet_config_sync_and_log_errors(
         elapsed_seconds += delay_seconds
         try:
             verify = await proxy_client.proxy_fleet_telemetry_get(access_token)
-        except Exception as err:
+        except PROXY_REQUEST_ERRORS as err:
             _LOGGER.debug(
                 "Unable to re-read fleet_telemetry_config for %s after push: %s",
                 vin,

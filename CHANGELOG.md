@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - Unreleased
 
 Added:
 
@@ -14,6 +14,15 @@ Changed:
 - Burst updates flush at a fixed interval, so a continuous stream can no longer delay entity updates indefinitely.
 - Commands that wake the vehicle retry as soon as telemetry reports it connected, instead of always waiting 12 seconds.
 - MQTT messages are handed to Home Assistant in batches, rather than one event-loop wakeup per message.
+- Requires `tesla-fleet-api` 1.17.2 or newer (below 2.0), and no longer touches the library's private attributes or methods.
+- Error handling catches only the expected network, Tesla API and certificate errors, so unexpected bugs are no longer silently logged and ignored.
+- Documented minimum Home Assistant version corrected to 2026.1 (matching `hacs.json`).
+
+Internal:
+
+- Entity/field descriptions moved from `const.py` to `descriptions.py`; config-flow helpers moved to `flow_helpers.py`.
+- Test files renamed by feature; CI enforces a minimum coverage of 50%.
+- Audit notes moved to `docs/dev/`, architecture notes to `docs/ARCHITECTURE.md`.
 
 ## 1.0.0 - 2026-05-02
 

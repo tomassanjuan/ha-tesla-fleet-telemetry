@@ -46,7 +46,9 @@ async def test_vin_fetch_uses_detected_region(hass) -> None:
         return "na"
 
     api.find_server = _find_server
-    api._request = AsyncMock(return_value={"response": [{"vin": TEST_VIN.lower()}]})
+    api.vehicles.createFleet.return_value.list = AsyncMock(
+        return_value={"response": [{"vin": TEST_VIN.lower()}]}
+    )
 
     with patch.object(oauth2, "TeslaFleetApi", return_value=api):
         vins, api_base = await oauth2.async_fetch_available_vins(hass, "token")
