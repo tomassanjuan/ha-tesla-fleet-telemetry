@@ -99,12 +99,21 @@ class TeslaFleetEntryData:
 
 def _sync_device_metadata(
     hass: HomeAssistant,
+    entry: ConfigEntry,
     coordinator: TelemetryCoordinator,
     vin: str,
 ) -> None:
     """Update device registry metadata from coordinator fields."""
     device_registry = dr.async_get(hass)
-    device = device_registry.async_get_device(identifiers={(DOMAIN, vin)})
+    # Scope to this entry: identifiers are not unique across config entries.
+    device = next(
+        (
+            d
+            for d in dr.async_entries_for_config_entry(device_registry, entry.entry_id)
+            if (DOMAIN, vin) in d.identifiers
+        ),
+        None,
+    )
     if device is None:
         return
 
@@ -187,7 +196,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
     def _on_telemetry(field: str, value: Any) -> None:
         coordinator.async_update_field(field, value)
         if field in DEVICE_METADATA_FIELDS:
-            _sync_device_metadata(hass, coordinator, vin)
+            _sync_device_metadata(hass, entry, coordinator, vin)
 
     def _on_alert(alert_code: str, alert_data: Any) -> None:
         coordinator.update_alert(alert_code, alert_data)
@@ -606,7 +615,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
     # --- Load platforms ---
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        _sync_device_metadata(hass, coordinator, vin)
+        _sync_device_metadata(hass, entry, coordinator, vin)
         _sync_entry_title(hass, entry, vin)
 
         # Enforce default enabled/disabled policy after entities are created.
@@ -724,7 +733,7 @@ async def _async_run_setup_bootstrap(
             except (TimeoutError, OSError) as err:
                 _LOGGER.debug("Setup wake_up failed for %s: %s", vin, err)
 
-        _sync_device_metadata(hass, coordinator, vin)
+        _sync_device_metadata(hass, entry, coordinator, vin)
         _LOGGER.debug("Completed background setup bootstrap for %s", vin)
     except asyncio.CancelledError:
         raise
