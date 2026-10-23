@@ -195,6 +195,34 @@ class UnknownFieldRepairFlow(RepairsFlow):
         return self.async_create_entry(title="", data={})
 
 
+class BlockerRepairFlow(RepairsFlow):
+    """Repair flow for blocking problems: the user fixes it, then confirms here.
+
+    Confirming dismisses the issue and re-pushes the config so Tesla retries at
+    once; if the problem persists the next error fetch raises the issue again.
+    """
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Show instructions, then retry on submit."""
+        issue = ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id)
+        data = issue.data if issue and isinstance(issue.data, dict) else {}
+        vin = str(data.get("vin") or "")
+        if user_input is None:
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema({}),
+                description_placeholders=issue.translation_placeholders if issue else None,
+            )
+        async_delete_issue(self.hass, DOMAIN, self.issue_id)
+        found = _find_entry_for_vin(self.hass, vin)
+        if found is not None:
+            try:
+                await found[1].push_telemetry_config(reason="manual")
+            except Exception as err:
+                _LOGGER.debug("Config push after blocker repair failed for %s: %s", vin, err)
+        return self.async_create_entry(title="", data={})
+
+
 async def async_create_fix_flow(
     hass: HomeAssistant,
     issue_id: str,
@@ -203,6 +231,8 @@ async def async_create_fix_flow(
     """Create a repair flow for Tesla Fleet Telemetry issues."""
     if issue_id.startswith("key_not_paired_"):
         return VKeyNotPairedRepairFlow()
+    if issue_id.startswith("blocker_"):
+        return BlockerRepairFlow()
     if issue_id.startswith("unknown_field_"):
         return UnknownFieldRepairFlow()
     return None

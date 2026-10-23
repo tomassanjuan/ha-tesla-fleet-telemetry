@@ -235,6 +235,76 @@ def _dismiss_key_not_paired(hass: HomeAssistant, vin: str) -> None:
     async_delete_issue(hass, DOMAIN, f"key_not_paired_{vin}")
 
 
+# Blocking problems that stop telemetry entirely until the user acts. Each maps
+# to a repair issue "blocker_<kind>_<vin>" (translation_key "blocker_<kind>").
+_BLOCKER_KINDS = (
+    "tls_cert_expired",
+    "tls_cert_invalid",
+    "server_unreachable",
+    "unsupported_hardware",
+    "unsupported_firmware",
+    "endpoint_not_registered",
+    "config_slots_full",
+)
+# Streaming errors older than this are history, not a current blocker.
+_BLOCKER_MAX_AGE_HOURS = 6
+
+
+def _classify_blocker(text: str) -> str | None:
+    """Map a Tesla telemetry/push error text to a blocker kind, or None."""
+    lowered = text.lower()
+    if "certificate has expired" in lowered:
+        return "tls_cert_expired"
+    if any(
+        m in lowered
+        for m in ("x509", "failed to verify certificate", "bad certificate", "unknown authority")
+    ):
+        return "tls_cert_invalid"
+    if any(
+        m in lowered
+        for m in ("connection refused", "no such host", "i/o timeout", "no route to host")
+    ):
+        return "server_unreachable"
+    if "unsupported_hardware" in lowered:
+        return "unsupported_hardware"
+    if "unsupported_firmware" in lowered:
+        return "unsupported_firmware"
+    if "endpoint" in lowered and ("not registered" in lowered or "not_registered" in lowered):
+        return "endpoint_not_registered"
+    if "max_configs" in lowered:
+        return "config_slots_full"
+    return None
+
+
+def _blocker_issue_id(kind: str, vin: str) -> str:
+    return f"blocker_{kind}_{vin}"
+
+
+def _raise_blocker(hass: HomeAssistant, vin: str, kind: str, target: str | None = None) -> None:
+    """Create (idempotently) the repair issue for a blocking problem."""
+    issue_id = _blocker_issue_id(kind, vin)
+    if ir.async_get(hass).async_get_issue(DOMAIN, issue_id):
+        return
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=True,
+        severity=ir.IssueSeverity.ERROR,
+        translation_key=f"blocker_{kind}",
+        translation_placeholders={"vin": vin, "target": target or "your telemetry server"},
+        data={"vin": vin, "kind": kind},
+    )
+    _LOGGER.error("Created repair issue %s: Fleet Telemetry is blocked until you act", issue_id)
+
+
+def _clear_blockers(hass: HomeAssistant, vin: str, keep: set[str] = frozenset()) -> None:
+    """Remove blocker issues for this VIN whose kind is not in `keep`."""
+    for kind in _BLOCKER_KINDS:
+        if kind not in keep:
+            ir.async_delete_issue(hass, DOMAIN, _blocker_issue_id(kind, vin))
+
+
 def _response_vin_skipped_missing_key(vin: str, response: Any) -> bool:
     """Return True if the push response reports missing_key for this VIN."""
     if not isinstance(response, dict):
@@ -248,7 +318,9 @@ def _response_vin_skipped_missing_key(vin: str, response: Any) -> bool:
     return vin in (skipped.get("missing_key") or [])
 
 
-def _log_push_response_skipped(vin: str, response: Any) -> None:
+def _log_push_response_skipped(
+    vin: str, response: Any, hass: HomeAssistant | None = None
+) -> None:
     """Warn when Tesla's push response shows the vehicle was skipped."""
     if not isinstance(response, dict):
         return
@@ -267,6 +339,9 @@ def _log_push_response_skipped(vin: str, response: Any) -> None:
     for key, reason in reasons.items():
         if vin in (skipped.get(key) or []):
             _LOGGER.warning("fleet_telemetry_config push blocked for %s: %s", vin, reason)
+            kind = _classify_blocker(key)
+            if hass is not None and kind:
+                _raise_blocker(hass, vin, kind)
 
 
 def _is_fatal_fleet_config_push_error(err: Exception) -> bool:
@@ -279,9 +354,14 @@ def _is_fatal_fleet_config_push_error(err: Exception) -> bool:
     )
 
 
-def _log_fleet_config_push_error(vin: str, err: Exception) -> None:
+def _log_fleet_config_push_error(
+    vin: str, err: Exception, hass: HomeAssistant | None = None
+) -> None:
     """Log actionable fleet telemetry push failures."""
     message = str(err)
+    kind = _classify_blocker(message)
+    if hass is not None and kind in _BLOCKER_KINDS:
+        _raise_blocker(hass, vin, kind)
     lowered = message.lower()
 
     if "sleep" in lowered or "asleep" in lowered:
@@ -352,6 +432,8 @@ async def _log_fleet_telemetry_errors(
         return
 
     raw_errors = _extract_fleet_telemetry_errors(payload)
+    if hass is not None:
+        _sync_stream_blockers(hass, vin, raw_errors)
     if not raw_errors:
         _LOGGER.debug("No recent fleet_telemetry_errors reported for %s", vin)
         return
@@ -362,6 +444,30 @@ async def _log_fleet_telemetry_errors(
     now_utc = datetime.now(UTC)
     for errors in _group_fleet_telemetry_errors(raw_errors)[:FLEET_TELEMETRY_ERROR_LOG_LIMIT]:
         _process_and_log_telemetry_errors(errors, vin, now_utc, seen_error_keys, hass)
+
+
+def _sync_stream_blockers(hass: HomeAssistant, vin: str, raw_errors: list[dict[str, Any]]) -> None:
+    """Raise repairs for fresh blocking stream errors; clear the ones that stopped.
+
+    Push-time blockers (hardware/firmware/endpoint/slots) are left alone here:
+    they are raised and cleared by the push path.
+    """
+    now = datetime.now(UTC)
+    found: dict[str, str | None] = {}
+    for error in raw_errors:
+        created = _parse_fleet_telemetry_error_created_at(error.get("created_at"))
+        if created is not None and (now - created).total_seconds() > _BLOCKER_MAX_AGE_HOURS * 3600:
+            continue
+        kind = _classify_blocker(f"{error.get('error_name') or ''} {error.get('error') or ''}")
+        if kind in ("tls_cert_expired", "tls_cert_invalid", "server_unreachable"):
+            found[kind] = _format_fleet_telemetry_error_target(
+                error.get("hostname"), error.get("port")
+            )
+    for kind, target in found.items():
+        _raise_blocker(hass, vin, kind, target)
+    for kind in ("tls_cert_expired", "tls_cert_invalid", "server_unreachable"):
+        if kind not in found:
+            ir.async_delete_issue(hass, DOMAIN, _blocker_issue_id(kind, vin))
 
 
 def _group_fleet_telemetry_errors(
@@ -753,7 +859,12 @@ async def _do_push_and_sync(
         vin,
         response,
     )
-    _log_push_response_skipped(vin, response)
+    if hass is not None:
+        # Push-time blockers are re-raised below if Tesla still skips the vehicle.
+        for kind in ("unsupported_hardware", "unsupported_firmware", "config_slots_full"):
+            ir.async_delete_issue(hass, DOMAIN, _blocker_issue_id(kind, vin))
+        ir.async_delete_issue(hass, DOMAIN, _blocker_issue_id("endpoint_not_registered", vin))
+    _log_push_response_skipped(vin, response, hass)
     if not wait_for_sync:
         # Propagate key_paired=False from skipped_vehicles.missing_key so the
         # caller's _notify_key_not_paired path fires without waiting for the sync GET.
@@ -889,7 +1000,7 @@ async def _push_telemetry_config(
             authorized_interval_overrides=dict(authorized_overrides),
         )
     except Exception as err:
-        _log_fleet_config_push_error(vin, err)
+        _log_fleet_config_push_error(vin, err, hass)
         if _is_fatal_fleet_config_push_error(err):
             raise HomeAssistantError(
                 "Tesla rejected the fleet telemetry configuration; check generated payload fields, "

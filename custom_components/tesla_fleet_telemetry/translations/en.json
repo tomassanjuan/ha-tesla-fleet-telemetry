@@ -166,6 +166,83 @@
           }
         }
       }
+    },
+    "blocker_tls_cert_expired": {
+      "title": "Telemetry Server Certificate Expired — {vin}",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Telemetry Server Certificate Expired — {vin}",
+            "description": "The TLS certificate of your telemetry server (`{target}`) has **expired**, so the vehicle cannot connect and **no telemetry is received**.\\n\\n1. Renew the certificate on the telemetry server host.\\n2. Replace `fullchain.pem` / `privkey.pem` and restart the fleet-telemetry container.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+          }
+        }
+      }
+    },
+    "blocker_tls_cert_invalid": {
+      "title": "Telemetry Server Certificate Invalid — {vin}",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Telemetry Server Certificate Invalid — {vin}",
+            "description": "The vehicle rejected the TLS certificate of `{target}` (untrusted, wrong hostname or incomplete chain), so **no telemetry is received**.\\n\\nUse a publicly trusted certificate with the full chain whose name matches the telemetry server hostname, then restart the fleet-telemetry container.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+          }
+        }
+      }
+    },
+    "blocker_server_unreachable": {
+      "title": "Telemetry Server Unreachable — {vin}",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Telemetry Server Unreachable — {vin}",
+            "description": "The vehicle cannot reach `{target}` (connection refused, timeout or DNS failure), so **no telemetry is received**.\\n\\nCheck that the fleet-telemetry container is running, DNS points to your public IP and the port is forwarded/open.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+          }
+        }
+      }
+    },
+    "blocker_unsupported_hardware": {
+      "title": "Vehicle Hardware Unsupported — {vin}",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Vehicle Hardware Unsupported — {vin}",
+            "description": "Tesla reports that this vehicle's hardware does not support Fleet Telemetry. Streaming cannot work for **{vin}**; remove the integration entry for it.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+          }
+        }
+      }
+    },
+    "blocker_unsupported_firmware": {
+      "title": "Vehicle Firmware Too Old — {vin}",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Vehicle Firmware Too Old — {vin}",
+            "description": "Tesla reports that the firmware of **{vin}** is too old for Fleet Telemetry. Update the vehicle software in the Tesla app.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+          }
+        }
+      }
+    },
+    "blocker_endpoint_not_registered": {
+      "title": "Telemetry Endpoint Not Registered — {vin}",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Telemetry Endpoint Not Registered — {vin}",
+            "description": "Tesla says the telemetry endpoint is not registered. Re-register your partner domain with Tesla and make sure the telemetry hostname in the integration options matches it.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+          }
+        }
+      }
+    },
+    "blocker_config_slots_full": {
+      "title": "Telemetry Config Slots Full — {vin}",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Telemetry Config Slots Full — {vin}",
+            "description": "Tesla reports the maximum number of Fleet Telemetry configurations is reached for **{vin}**. Remove other apps' telemetry configurations (e.g. in the Tesla app) and retry.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+          }
+        }
+      }
     }
   },
   "application_credentials": {
