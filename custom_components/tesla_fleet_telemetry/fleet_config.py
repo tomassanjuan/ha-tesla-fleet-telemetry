@@ -453,9 +453,14 @@ def _sync_stream_blockers(hass: HomeAssistant, vin: str, raw_errors: list[dict[s
     they are raised and cleared by the push path.
     """
     now = datetime.now(UTC)
+    # After a manual retry only errors newer than the retry count, so history
+    # from before the user's fix does not re-raise the issue.
+    since = hass.data.get(DOMAIN + "_blocker_retry", {}).get(vin)
     found: dict[str, str | None] = {}
     for error in raw_errors:
         created = _parse_fleet_telemetry_error_created_at(error.get("created_at"))
+        if since is not None and (created is None or created < since):
+            continue
         if created is not None and (now - created).total_seconds() > _BLOCKER_MAX_AGE_HOURS * 3600:
             continue
         kind = _classify_blocker(f"{error.get('error_name') or ''} {error.get('error') or ''}")

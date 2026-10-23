@@ -173,8 +173,18 @@
         "step": {
           "init": {
             "title": "Telemetry Server Certificate Expired — {vin}",
-            "description": "The TLS certificate of your telemetry server (`{target}`) has **expired**, so the vehicle cannot connect and **no telemetry is received**.\\n\\n1. Renew the certificate on the telemetry server host.\\n2. Replace `fullchain.pem` / `privkey.pem` and restart the fleet-telemetry container.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+            "description": "The TLS certificate of your telemetry server (`{target}`) has **expired**, so the vehicle cannot connect and **no telemetry is received**.\n\n1. Renew the certificate on the telemetry server host.\n2. Replace `fullchain.pem` / `privkey.pem` and restart the fleet-telemetry container.\n\nWhen you have done that, choose **Retry now** to push the configuration again and check, or **Reload the integration**.",
+            "menu_options": {
+              "retry": "Retry now (push config again and check)",
+              "reload": "Reload the integration"
+            }
           }
+        },
+        "abort": {
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry entry for this vehicle.",
+          "still_blocked": "**Still blocked.** The configuration was pushed again, but Tesla reports the same problem for `{target}`. Fix the cause described in the issue and try again. The issue stays in Repairs.",
+          "retry_sent": "**Configuration pushed again.** No new error has been reported so far. If the vehicle is asleep it only reconnects when it wakes up, which can take a few minutes. If the problem persists the issue will reappear here on its own.",
+          "reloaded": "**Integration reloaded.** It reconnected and pushed the configuration again. If the problem persists the issue will reappear here on its own."
         }
       }
     },
@@ -184,8 +194,18 @@
         "step": {
           "init": {
             "title": "Telemetry Server Certificate Invalid — {vin}",
-            "description": "The vehicle rejected the TLS certificate of `{target}` (untrusted, wrong hostname or incomplete chain), so **no telemetry is received**.\\n\\nUse a publicly trusted certificate with the full chain whose name matches the telemetry server hostname, then restart the fleet-telemetry container.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+            "description": "The vehicle rejected the TLS certificate of `{target}` (untrusted, wrong hostname or incomplete chain), so **no telemetry is received**.\n\nUse a publicly trusted certificate with the full chain whose name matches the telemetry server hostname, then restart the fleet-telemetry container.\n\nWhen you have done that, choose **Retry now** to push the configuration again and check, or **Reload the integration**.",
+            "menu_options": {
+              "retry": "Retry now (push config again and check)",
+              "reload": "Reload the integration"
+            }
           }
+        },
+        "abort": {
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry entry for this vehicle.",
+          "still_blocked": "**Still blocked.** The configuration was pushed again, but Tesla reports the same problem for `{target}`. Fix the cause described in the issue and try again. The issue stays in Repairs.",
+          "retry_sent": "**Configuration pushed again.** No new error has been reported so far. If the vehicle is asleep it only reconnects when it wakes up, which can take a few minutes. If the problem persists the issue will reappear here on its own.",
+          "reloaded": "**Integration reloaded.** It reconnected and pushed the configuration again. If the problem persists the issue will reappear here on its own."
         }
       }
     },
@@ -195,8 +215,18 @@
         "step": {
           "init": {
             "title": "Telemetry Server Unreachable — {vin}",
-            "description": "The vehicle cannot reach `{target}` (connection refused, timeout or DNS failure), so **no telemetry is received**.\\n\\nCheck that the fleet-telemetry container is running, DNS points to your public IP and the port is forwarded/open.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+            "description": "The vehicle cannot reach `{target}` (connection refused, timeout or DNS failure), so **no telemetry is received**.\n\nCheck that the fleet-telemetry container is running, DNS points to your public IP and the port is forwarded/open.\n\nWhen you have done that, choose **Retry now** to push the configuration again and check, or **Reload the integration**.",
+            "menu_options": {
+              "retry": "Retry now (push config again and check)",
+              "reload": "Reload the integration"
+            }
           }
+        },
+        "abort": {
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry entry for this vehicle.",
+          "still_blocked": "**Still blocked.** The configuration was pushed again, but Tesla reports the same problem for `{target}`. Fix the cause described in the issue and try again. The issue stays in Repairs.",
+          "retry_sent": "**Configuration pushed again.** No new error has been reported so far. If the vehicle is asleep it only reconnects when it wakes up, which can take a few minutes. If the problem persists the issue will reappear here on its own.",
+          "reloaded": "**Integration reloaded.** It reconnected and pushed the configuration again. If the problem persists the issue will reappear here on its own."
         }
       }
     },
@@ -206,8 +236,18 @@
         "step": {
           "init": {
             "title": "Vehicle Hardware Unsupported — {vin}",
-            "description": "Tesla reports that this vehicle's hardware does not support Fleet Telemetry. Streaming cannot work for **{vin}**; remove the integration entry for it.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+            "description": "Tesla reports that this vehicle's hardware does not support Fleet Telemetry. Streaming cannot work for **{vin}**; remove the integration entry for it.\n\nWhen you have done that, choose **Retry now** to push the configuration again and check, or **Reload the integration**.",
+            "menu_options": {
+              "retry": "Retry now (push config again and check)",
+              "reload": "Reload the integration"
+            }
           }
+        },
+        "abort": {
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry entry for this vehicle.",
+          "still_blocked": "**Still blocked.** The configuration was pushed again, but Tesla reports the same problem for `{target}`. Fix the cause described in the issue and try again. The issue stays in Repairs.",
+          "retry_sent": "**Configuration pushed again.** No new error has been reported so far. If the vehicle is asleep it only reconnects when it wakes up, which can take a few minutes. If the problem persists the issue will reappear here on its own.",
+          "reloaded": "**Integration reloaded.** It reconnected and pushed the configuration again. If the problem persists the issue will reappear here on its own."
         }
       }
     },
@@ -217,8 +257,18 @@
         "step": {
           "init": {
             "title": "Vehicle Firmware Too Old — {vin}",
-            "description": "Tesla reports that the firmware of **{vin}** is too old for Fleet Telemetry. Update the vehicle software in the Tesla app.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+            "description": "Tesla reports that the firmware of **{vin}** is too old for Fleet Telemetry. Update the vehicle software in the Tesla app.\n\nWhen you have done that, choose **Retry now** to push the configuration again and check, or **Reload the integration**.",
+            "menu_options": {
+              "retry": "Retry now (push config again and check)",
+              "reload": "Reload the integration"
+            }
           }
+        },
+        "abort": {
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry entry for this vehicle.",
+          "still_blocked": "**Still blocked.** The configuration was pushed again, but Tesla reports the same problem for `{target}`. Fix the cause described in the issue and try again. The issue stays in Repairs.",
+          "retry_sent": "**Configuration pushed again.** No new error has been reported so far. If the vehicle is asleep it only reconnects when it wakes up, which can take a few minutes. If the problem persists the issue will reappear here on its own.",
+          "reloaded": "**Integration reloaded.** It reconnected and pushed the configuration again. If the problem persists the issue will reappear here on its own."
         }
       }
     },
@@ -228,8 +278,18 @@
         "step": {
           "init": {
             "title": "Telemetry Endpoint Not Registered — {vin}",
-            "description": "Tesla says the telemetry endpoint is not registered. Re-register your partner domain with Tesla and make sure the telemetry hostname in the integration options matches it.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+            "description": "Tesla says the telemetry endpoint is not registered. Re-register your partner domain with Tesla and make sure the telemetry hostname in the integration options matches it.\n\nWhen you have done that, choose **Retry now** to push the configuration again and check, or **Reload the integration**.",
+            "menu_options": {
+              "retry": "Retry now (push config again and check)",
+              "reload": "Reload the integration"
+            }
           }
+        },
+        "abort": {
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry entry for this vehicle.",
+          "still_blocked": "**Still blocked.** The configuration was pushed again, but Tesla reports the same problem for `{target}`. Fix the cause described in the issue and try again. The issue stays in Repairs.",
+          "retry_sent": "**Configuration pushed again.** No new error has been reported so far. If the vehicle is asleep it only reconnects when it wakes up, which can take a few minutes. If the problem persists the issue will reappear here on its own.",
+          "reloaded": "**Integration reloaded.** It reconnected and pushed the configuration again. If the problem persists the issue will reappear here on its own."
         }
       }
     },
@@ -239,8 +299,18 @@
         "step": {
           "init": {
             "title": "Telemetry Config Slots Full — {vin}",
-            "description": "Tesla reports the maximum number of Fleet Telemetry configurations is reached for **{vin}**. Remove other apps' telemetry configurations (e.g. in the Tesla app) and retry.\n\nClick **Submit** once done: the configuration is pushed to Tesla again to verify."
+            "description": "Tesla reports the maximum number of Fleet Telemetry configurations is reached for **{vin}**. Remove other apps' telemetry configurations (e.g. in the Tesla app) and retry.\n\nWhen you have done that, choose **Retry now** to push the configuration again and check, or **Reload the integration**.",
+            "menu_options": {
+              "retry": "Retry now (push config again and check)",
+              "reload": "Reload the integration"
+            }
           }
+        },
+        "abort": {
+          "entry_not_found": "Could not find the Tesla Fleet Telemetry entry for this vehicle.",
+          "still_blocked": "**Still blocked.** The configuration was pushed again, but Tesla reports the same problem for `{target}`. Fix the cause described in the issue and try again. The issue stays in Repairs.",
+          "retry_sent": "**Configuration pushed again.** No new error has been reported so far. If the vehicle is asleep it only reconnects when it wakes up, which can take a few minutes. If the problem persists the issue will reappear here on its own.",
+          "reloaded": "**Integration reloaded.** It reconnected and pushed the configuration again. If the problem persists the issue will reappear here on its own."
         }
       }
     }

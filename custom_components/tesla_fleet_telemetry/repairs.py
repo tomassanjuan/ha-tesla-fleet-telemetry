@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 import voluptuous as vol
@@ -196,31 +197,52 @@ class UnknownFieldRepairFlow(RepairsFlow):
 
 
 class BlockerRepairFlow(RepairsFlow):
-    """Repair flow for blocking problems: the user fixes it, then confirms here.
+    """Repair flow for blocking problems: explain, then retry or reload.
 
-    Confirming dismisses the issue and re-pushes the config so Tesla retries at
-    once; if the problem persists the next error fetch raises the issue again.
+    The issue is only dismissed when a retry shows no new blocking error; if
+    Tesla still reports it, the flow says so and the issue stays.
     """
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Show instructions, then retry on submit."""
+    def _issue(self) -> tuple[str, dict[str, str]]:
         issue = ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id)
         data = issue.data if issue and isinstance(issue.data, dict) else {}
-        vin = str(data.get("vin") or "")
-        if user_input is None:
-            return self.async_show_form(
-                step_id="init",
-                data_schema=vol.Schema({}),
-                description_placeholders=issue.translation_placeholders if issue else None,
-            )
-        async_delete_issue(self.hass, DOMAIN, self.issue_id)
+        placeholders = dict(issue.translation_placeholders or {}) if issue else {}
+        return str(data.get("vin") or ""), placeholders
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Explain the problem and offer the actions."""
+        _, placeholders = self._issue()
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["retry", "reload"],
+            description_placeholders=placeholders,
+        )
+
+    async def async_step_retry(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Re-push the config to Tesla and report whether the problem persists."""
+        vin, placeholders = self._issue()
         found = _find_entry_for_vin(self.hass, vin)
-        if found is not None:
-            try:
-                await found[1].push_telemetry_config(reason="manual")
-            except Exception as err:
-                _LOGGER.debug("Config push after blocker repair failed for %s: %s", vin, err)
-        return self.async_create_entry(title="", data={})
+        if found is None:
+            return self.async_abort(reason="entry_not_found")
+        self.hass.data.setdefault(DOMAIN + "_blocker_retry", {})[vin] = datetime.now(UTC)
+        async_delete_issue(self.hass, DOMAIN, self.issue_id)
+        try:
+            await found[1].push_telemetry_config(reason="manual")
+        except Exception as err:
+            _LOGGER.warning("Config push during blocker retry failed for %s: %s", vin, err)
+            placeholders["error"] = str(err)
+        if ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id):
+            return self.async_abort(reason="still_blocked", description_placeholders=placeholders)
+        return self.async_abort(reason="retry_sent", description_placeholders=placeholders)
+
+    async def async_step_reload(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Reload the integration (new connection, fresh config push)."""
+        vin, _ = self._issue()
+        found = _find_entry_for_vin(self.hass, vin)
+        if found is None:
+            return self.async_abort(reason="entry_not_found")
+        await self.hass.config_entries.async_reload(found[0])
+        return self.async_abort(reason="reloaded")
 
 
 async def async_create_fix_flow(
