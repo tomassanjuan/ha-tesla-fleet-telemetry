@@ -24,7 +24,6 @@ from homeassistant.util.ssl import client_context
 
 from .const import (
     BOOTSTRAP_PUSH_RETRY_DELAY_SECONDS,
-    CONF_CONNECTION_TIMEOUT,
     CONF_DOMAIN,
     CONF_MQTT_HOST,
     CONF_MQTT_PASSWORD,
@@ -209,10 +208,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
         raise ConfigEntryError("Invalid MQTT configuration")
     try:
         mqtt_port = int(mqtt_port)
-        connection_timeout = int(_opts.get(CONF_CONNECTION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT))
     except (TypeError, ValueError) as err:
         raise ConfigEntryError("Invalid connection configuration") from err
-    connection_timeout = max(5, min(60, connection_timeout))
     if not 1 <= mqtt_port <= 65535:
         raise ConfigEntryError("Invalid MQTT port")
     topic_base = _opts.get(CONF_MQTT_TOPIC_BASE, entry_data.get(CONF_MQTT_TOPIC_BASE)) or (
@@ -229,7 +226,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
         vin=vin,
         on_message=_on_telemetry,
         on_alert=_on_alert,
-        timeout_seconds=connection_timeout,
+        timeout_seconds=DEFAULT_CONNECTION_TIMEOUT,
         topic_base=topic_base,
         username=_opts.get(CONF_MQTT_USERNAME) or None,
         password=_opts.get(CONF_MQTT_PASSWORD) or None,
@@ -256,7 +253,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
         hass,
         proxy_url,
         vin,
-        timeout_seconds=connection_timeout,
+        timeout_seconds=DEFAULT_CONNECTION_TIMEOUT,
         verify_ssl=bool(_opts.get(CONF_PROXY_VERIFY_SSL)),
     )
     try:

@@ -13,7 +13,6 @@ from homeassistant.helpers import config_entry_oauth2_flow
 from .const import (
     CONF_CLIENT_ID,
     CONF_CLIENT_SECRET,
-    CONF_CONNECTION_TIMEOUT,
     CONF_DOMAIN,
     CONF_FLEET_API_BASE,
     CONF_MQTT_HOST,
@@ -574,13 +573,6 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
         errors: dict[str, str],
     ) -> bool:
         """Validate MQTT, proxy, and telemetry settings. Returns True if valid."""
-        # Get user-defined timeout or use default
-        timeout = user_input.get(CONF_CONNECTION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT)
-        try:
-            timeout = max(5, min(60, int(timeout)))
-        except (TypeError, ValueError):
-            timeout = DEFAULT_CONNECTION_TIMEOUT
-
         # Validate MQTT endpoint format and reachability.
         try:
             mqtt_host, mqtt_port = parse_mqtt_endpoint(user_input.get(CONF_MQTT_ENDPOINT, ""))
@@ -597,7 +589,7 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
                     mqtt_host,
                     mqtt_port,
                     proxy_url,
-                    timeout=timeout,
+                    timeout=DEFAULT_CONNECTION_TIMEOUT,
                     verify_ssl=bool(user_input.get(CONF_PROXY_VERIFY_SSL)),
                 )
             )
