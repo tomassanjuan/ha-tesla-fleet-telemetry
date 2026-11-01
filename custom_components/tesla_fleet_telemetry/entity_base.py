@@ -49,6 +49,7 @@ class TelemetryEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
         self._vin = vin
         self._attr_unique_id = telemetry_unique_id(vin, description.key)
         self._restored_state: str | None = None
+        self._restored_unit: str | None = None
         # Name, icon, and entity_registry_enabled_default are read from
         # entity_description by HA; subclasses set self.entity_description.
 
@@ -57,6 +58,7 @@ class TelemetryEntity(CoordinatorEntity[TelemetryCoordinator], RestoreEntity):
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state not in _UNRESTORED_STATES:
             self._restored_state = last_state.state
+            self._restored_unit = last_state.attributes.get("unit_of_measurement")
 
     @property
     def device_info(self) -> DeviceInfo:

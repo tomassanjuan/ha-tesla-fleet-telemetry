@@ -8,9 +8,15 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
+from homeassistant.components.sensor.const import UNIT_CONVERTERS
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -172,6 +178,31 @@ def _charger_efficiency(coordinator: TelemetryCoordinator) -> float | None:
     return efficiency
 
 
+def _restored_to_native(
+    state: str, unit: str | None, desc: SensorEntityDescription
+) -> float | None:
+    """Turn a restored HA state back into the sensor's native unit.
+
+    HA stores the state in the *display* unit (e.g. km); native_value must be
+    in the native unit (mi). Returning the stored number unconverted makes HA
+    convert it a second time on every restart.
+    """
+    try:
+        num = float(state)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(num):
+        return None
+    native = desc.native_unit_of_measurement
+    conv = UNIT_CONVERTERS.get(desc.device_class)
+    if unit and native and unit != native and conv is not None:
+        try:
+            num = conv.convert(num, unit, native)
+        except HomeAssistantError:
+            return None
+    return num
+
+
 def _bms_full_rated_range(coordinator: TelemetryCoordinator) -> float | None:
     rated_range = _float_field(coordinator, "RatedRange")
     soc = _float_field(coordinator, "Soc")
@@ -283,7 +314,10 @@ class TelemetrySensor(TelemetryEntity, SensorEntity):
         if self._is_timestamp:
             return _to_utc_datetime(restored)
         if self._is_numeric:
-            return self._convert_to_numeric(restored)
+            # Already post-multiplier: only undo the display-unit conversion.
+            return _restored_to_native(
+                restored, self._restored_unit, self.entity_description
+            )
         return restored
 
     def _process_string_value(self, val: str) -> str | float | None:
@@ -385,10 +419,11 @@ class DerivedTelemetrySensor(RestoreEntity, SensorEntity):
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None:
-            try:
-                value = float(last_state.state)
-            except (TypeError, ValueError):
-                value = None
+            value = _restored_to_native(
+                last_state.state,
+                last_state.attributes.get("unit_of_measurement"),
+                self.entity_description,
+            )
             if value is not None:
                 self._restored_native_value = int(value) if value == int(value) else value
         self.async_on_remove(
