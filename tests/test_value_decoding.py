@@ -178,6 +178,22 @@ async def test_invalid_value_replaces_restored_state(
     assert sensor.available is False
 
 
+async def test_restored_distance_is_not_converted_twice(
+    hass: HomeAssistant, coordinator: TelemetryCoordinator
+) -> None:
+    """HA stores km (display unit); native is mi. Restore must convert back."""
+    description = next(d for d in DESCRIPTIONS if d.key == "RatedRange")
+    mock_restore_cache(
+        hass, [State("sensor.rated_range", "346.0", {"unit_of_measurement": "km"})]
+    )
+    sensor = TelemetrySensor(coordinator, description, TEST_VIN)
+    sensor.hass = hass
+    sensor.entity_id = "sensor.rated_range"
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == pytest.approx(346.0 / 1.609344, abs=0.01)
+
+
 async def test_unknown_field_repair_disables_as_user(
     hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
