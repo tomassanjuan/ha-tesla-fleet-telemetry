@@ -154,8 +154,8 @@ def tls_server(tmp_path: Path, socket_enabled: None) -> Generator[tuple[int, Pat
     listener.close()
 
 
-def test_trusted_server_returns_full_chain(tls_server: tuple[int, Path]) -> None:
-    """A trusted server's CA must include the root, not just the renewable leaf."""
+def test_trusted_server_returns_issuing_ca_only(tls_server: tuple[int, Path]) -> None:
+    """A trusted server's CA is the cert that signed the leaf, not the renewable leaf."""
     port, ca_path = tls_server
     trusting_ctx = ssl.create_default_context(cafile=str(ca_path))
 
@@ -166,7 +166,7 @@ def test_trusted_server_returns_full_chain(tls_server: tuple[int, Path]) -> None
         pem, trusted = _fetch_server_ca_blocking("127.0.0.1", port)
 
     assert trusted is True
-    assert pem.count("BEGIN CERTIFICATE") == 2
+    assert pem.count("BEGIN CERTIFICATE") == 1
     assert ca_path.read_text().split("-----BEGIN CERTIFICATE-----")[1][:40] in pem
 
 

@@ -17,6 +17,8 @@ Changed:
 - Requires `tesla-fleet-api` 1.17.2 or newer (below 2.0), and no longer touches the library's private attributes or methods.
 - Error handling catches only the expected network, Tesla API and certificate errors, so unexpected bugs are no longer silently logged and ignored.
 - Documented minimum Home Assistant version corrected to 2026.1 (matching `hacs.json`).
+- The telemetry server CA pushed to the vehicle is now only the certificate that issued the server's leaf (for example Let's Encrypt YE2), not the leaf plus the whole chain. Verified on a real vehicle. Existing entries switch to it on the next reload.
+- Blocking-problem repairs have a single Submit action that reloads the integration and says whether the stored CA changed. The separate Retry action is removed because it re-pushed the stale stored CA.
 
 Internal:
 
