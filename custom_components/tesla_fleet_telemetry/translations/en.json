@@ -294,9 +294,9 @@
   "selector": {
     "telemetry_mode": {
       "options": {
-        "realtime": "Realtime – every field about once a second. Best for live dashboards and charging sessions; highest data use.",
-        "normal": "Normal – updates about every 10 s with larger change thresholds. Balanced choice for everyday use.",
-        "low": "Low – updates about every 30 s with the largest thresholds. Lightest on data and vehicle battery; good for a parked car."
+        "realtime": "Realtime – 1s, best for live dashboards and charging",
+        "normal": "Normal – 10s, best for everyday use",
+        "low": "Low – 30s, best for a parked car"
       }
     }
   }
