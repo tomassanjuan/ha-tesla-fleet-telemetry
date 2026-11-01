@@ -53,3 +53,22 @@ def test_parse_telemetry_endpoint_rejects_empty() -> None:
 def test_parse_telemetry_endpoint_rejects_non_https_scheme() -> None:
     with pytest.raises(ValueError):
         parse_telemetry_endpoint("http://telemetry.example.com")
+
+
+@pytest.mark.parametrize(
+    ("domain", "ok"),
+    [
+        ("ha.example.com", True),
+        ("", True),
+        ("https://ha.example.com", False),
+        ("ha.example.com:443", False),
+        ("lita", False),
+        ("1.2.3.4", False),
+    ],
+)
+def test_validate_domain(domain: str, ok: bool) -> None:
+    from custom_components.tesla_fleet_telemetry.flow_helpers import validate_domain
+
+    errors: dict[str, str] = {}
+    validate_domain(domain, errors)
+    assert (not errors) is ok

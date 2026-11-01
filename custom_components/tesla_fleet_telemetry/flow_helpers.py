@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import re
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -69,22 +70,58 @@ async def async_verify_mqtt_reachable(
     host: str,
     port: int,
     timeout: int | None = None,
+    username: str | None = None,
+    password: str | None = None,
+    tls: bool = False,
 ) -> tuple[bool, str | None]:
-    """Check if MQTT broker is reachable. Returns (is_reachable, error_message)."""
-    import socket  # noqa: PLC0415
+    """Do a real MQTT handshake (credentials + TLS). Returns (ok, error_key)."""
+    import ssl  # noqa: PLC0415
+    import threading  # noqa: PLC0415
+
+    import paho.mqtt.client as mqtt  # noqa: PLC0415
+    from homeassistant.util.ssl import client_context  # noqa: PLC0415
 
     _timeout = timeout if timeout is not None else DEFAULT_CONNECTION_CHECK_TIMEOUT
 
     def _check_mqtt() -> tuple[bool, str | None]:
+        done = threading.Event()
+        rc: list[int] = []
+
+        def on_connect(client, userdata, flags, reason_code, properties) -> None:
+            rc.append(reason_code.value if hasattr(reason_code, "value") else int(reason_code))
+            done.set()
+
+        client = mqtt.Client(
+            protocol=mqtt.MQTTv5, callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+        )
+        client.on_connect = on_connect
+        client.on_connect_fail = lambda *_: done.set()
+        if username:
+            client.username_pw_set(username, password or "")
+        if tls:
+            client.tls_set_context(client_context())
         try:
-            sock = socket.create_connection((host, port), timeout=_timeout)
-            sock.close()
-            return True, None
+            client.connect(host, port, keepalive=10)
+            client.loop_start()
+            finished = done.wait(_timeout)
+        except ssl.SSLError as e:
+            _LOGGER.debug("MQTT TLS failed for %s:%s: %s", host, port, e)
+            return False, "mqtt_tls_failed"
         except TimeoutError:
             return False, "mqtt_timeout"
         except OSError as e:
             _LOGGER.debug("MQTT connection failed for %s:%s: %s", host, port, e)
             return False, "mqtt_unreachable"
+        finally:
+            client.disconnect()
+            client.loop_stop()
+        if not finished:
+            return False, "mqtt_timeout"
+        if not rc:  # on_connect_fail: TCP/TLS handshake error
+            return False, "mqtt_tls_failed" if tls else "mqtt_unreachable"
+        if rc[0] in (134, 135):  # bad user name or password / not authorized
+            return False, "mqtt_auth_failed"
+        return (True, None) if rc[0] == 0 else (False, "mqtt_unreachable")
 
     return cast(tuple[bool, str | None], await hass.async_add_executor_job(_check_mqtt))
 
@@ -141,10 +178,21 @@ async def async_verify_connection_endpoints(
     proxy_url: str,
     timeout: int | None = None,
     verify_ssl: bool = False,
+    mqtt_username: str | None = None,
+    mqtt_password: str | None = None,
+    mqtt_tls: bool = False,
 ) -> dict[str, str]:
     """Check MQTT and proxy endpoints in parallel; return form errors."""
     mqtt_result, proxy_result = await asyncio.gather(
-        async_verify_mqtt_reachable(hass, mqtt_host, mqtt_port, timeout=timeout),
+        async_verify_mqtt_reachable(
+            hass,
+            mqtt_host,
+            mqtt_port,
+            timeout=timeout,
+            username=mqtt_username,
+            password=mqtt_password,
+            tls=mqtt_tls,
+        ),
         async_verify_proxy_reachable(hass, proxy_url, timeout=timeout, verify_ssl=verify_ssl),
         return_exceptions=True,
     )
@@ -479,6 +527,17 @@ def normalize_telemetry_server_input(user_input: dict[str, Any]) -> dict[str, An
     normalized[CONF_TELEMETRY_SERVER_PORT] = port
     normalized[CONF_TELEMETRY_SERVER_CA] = ca
     return normalized
+
+
+_DOMAIN_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
+
+def validate_domain(domain: str, errors: dict[str, str]) -> str:
+    """Validate the optional Tesla app domain locally (bare DNS name, no scheme/port/path)."""
+    domain = domain.strip().lower().rstrip(".")
+    if domain and not _DOMAIN_RE.match(domain):
+        errors[CONF_DOMAIN] = "invalid_domain"
+    return domain
 
 
 def validate_proxy_url(proxy_url: str, errors: dict[str, str]) -> str:

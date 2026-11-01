@@ -10,6 +10,8 @@ Added:
 
 Changed:
 
+- Setup/options forms now do a real MQTT handshake (credentials and TLS), reporting rejected credentials or TLS failures at the form instead of looping "Not authorized" after setup.
+- The application domain is validated locally (bare DNS name) before calling Tesla.
 - Entities refresh only when a telemetry field they read changes, instead of every entity refreshing on every telemetry burst.
 - Burst updates flush at a fixed interval, so a continuous stream can no longer delay entity updates indefinitely.
 - Commands that wake the vehicle retry as soon as telemetry reports it connected, instead of always waiting 12 seconds.
