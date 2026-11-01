@@ -14,7 +14,6 @@ CONF_TELEMETRY_MODE = "telemetry_mode"
 CONF_TELEMETRY_SERVER_HOSTNAME = "telemetry_server_hostname"
 CONF_TELEMETRY_SERVER_PORT = "telemetry_server_port"
 CONF_TELEMETRY_SERVER_CA = "telemetry_server_ca"
-CONF_CONNECTION_TIMEOUT = "connection_timeout"
 DEFAULT_CONNECTION_TIMEOUT = 10
 # MQTT topic root the self-hosted fleet-telemetry server publishes under
 # (its "topic_base" setting in fleet-telemetry.json). Must match the user's

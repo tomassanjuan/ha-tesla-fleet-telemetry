@@ -21,7 +21,6 @@ from homeassistant.helpers.selector import (
 from tesla_fleet_api.exceptions import TeslaFleetError
 
 from .const import (
-    CONF_CONNECTION_TIMEOUT,
     CONF_DOMAIN,
     CONF_MQTT_HOST,
     CONF_MQTT_PASSWORD,
@@ -36,7 +35,6 @@ from .const import (
     CONF_TELEMETRY_SERVER_HOSTNAME,
     CONF_TELEMETRY_SERVER_PORT,
     DEFAULT_CONNECTION_CHECK_TIMEOUT,
-    DEFAULT_CONNECTION_TIMEOUT,
     DEFAULT_MQTT_TOPIC_BASE,
     DEFAULT_TELEMETRY_MODE,
     DEFAULT_TELEMETRY_SERVER_ENDPOINT,
@@ -380,10 +378,6 @@ def build_options_schema(merged: dict[str, Any]) -> vol.Schema:
                 CONF_PROXY_VERIFY_SSL,
                 default=bool(merged.get(CONF_PROXY_VERIFY_SSL, False)),
             ): bool,
-            vol.Optional(
-                CONF_CONNECTION_TIMEOUT,
-                default=merged.get(CONF_CONNECTION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT),
-            ): vol.All(vol.Coerce(int), vol.Range(min=5, max=60)),
         }
     )
 
