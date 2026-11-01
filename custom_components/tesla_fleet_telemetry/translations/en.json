@@ -49,7 +49,8 @@
           "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla).",
           "mqtt_username": "Leave empty if your broker allows anonymous connections.",
           "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store.",
-          "proxy_verify_ssl": "Enable only if the proxy uses a publicly trusted certificate. Leave off for the usual self-signed proxy certificate."
+          "proxy_verify_ssl": "Enable only if the proxy uses a publicly trusted certificate. Leave off for the usual self-signed proxy certificate.",
+          "telemetry_mode": "Realtime ≈1 s, Normal ≈10 s, Low ≈30 s per field. Locks, doors and other binary states always stream at 1 s. Use the quietest mode that fits."
         }
       }
     },
@@ -117,7 +118,8 @@
           "mqtt_topic_base": "The topic_base configured in your fleet-telemetry server's config (default: tesla).",
           "mqtt_username": "Leave empty if your broker allows anonymous connections.",
           "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store.",
-          "proxy_verify_ssl": "Enable only if the proxy uses a publicly trusted certificate. Leave off for the usual self-signed proxy certificate."
+          "proxy_verify_ssl": "Enable only if the proxy uses a publicly trusted certificate. Leave off for the usual self-signed proxy certificate.",
+          "telemetry_mode": "Realtime ≈1 s, Normal ≈10 s, Low ≈30 s per field. Locks, doors and other binary states always stream at 1 s. Use the quietest mode that fits."
         }
       }
     },
@@ -288,5 +290,14 @@
   },
   "application_credentials": {
     "description": "Create Tesla OAuth credentials in the [Tesla developer console]({console_url}), then add them in Home Assistant Application Credentials."
+  },
+  "selector": {
+    "telemetry_mode": {
+      "options": {
+        "realtime": "Realtime – every field about once a second. Best for live dashboards and charging sessions; highest data use.",
+        "normal": "Normal – updates about every 10 s with larger change thresholds. Balanced choice for everyday use.",
+        "low": "Low – updates about every 30 s with the largest thresholds. Lightest on data and vehicle battery; good for a parked car."
+      }
+    }
   }
 }

@@ -15,6 +15,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -343,14 +346,22 @@ def display_proxy_url(proxy_url: str) -> str:
 _PASSWORD_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
 
 
+_MODE_SELECTOR = SelectSelector(
+    SelectSelectorConfig(
+        options=list(TELEMETRY_MODE_OPTIONS),
+        mode=SelectSelectorMode.DROPDOWN,
+        translation_key=CONF_TELEMETRY_MODE,
+    )
+)
+
+
 def mqtt_auth_schema(values: dict[str, Any]) -> dict[Any, Any]:
-    """Optional MQTT credentials/TLS fields shared by the setup and options forms."""
+    """Optional MQTT credentials shared by the setup and options forms."""
     return {
         vol.Optional(CONF_MQTT_USERNAME, default=values.get(CONF_MQTT_USERNAME, "")): str,
         vol.Optional(
             CONF_MQTT_PASSWORD, default=values.get(CONF_MQTT_PASSWORD, "")
         ): _PASSWORD_SELECTOR,
-        vol.Optional(CONF_MQTT_TLS, default=bool(values.get(CONF_MQTT_TLS, False))): bool,
     }
 
 
@@ -363,33 +374,29 @@ def build_user_schema(
     previous: dict[str, Any] | None = None,
 ) -> vol.Schema:
     """Build the setup form schema; `previous` re-fills fields after a failed submit."""
+    previous = previous or {}
     return vol.Schema(
         {
             vol.Optional(CONF_DOMAIN, default=domain): str,
             vol.Required(CONF_TELEMETRY_SERVER_ENDPOINT, default=telemetry_endpoint): str,
-            vol.Required(CONF_TELEMETRY_MODE, default=telemetry_mode): vol.In(
-                TELEMETRY_MODE_OPTIONS
-            ),
-            vol.Required(CONF_MQTT_ENDPOINT, default=mqtt_endpoint): str,
-            **mqtt_auth_schema(previous or {}),
-            vol.Optional(CONF_MQTT_TOPIC_BASE, default=DEFAULT_MQTT_TOPIC_BASE): str,
             vol.Required(CONF_PROXY_URL, default=proxy_url): str,
+            vol.Required(CONF_MQTT_ENDPOINT, default=mqtt_endpoint): str,
+            **mqtt_auth_schema(previous),
+            vol.Required(CONF_TELEMETRY_MODE, default=telemetry_mode): _MODE_SELECTOR,
+            vol.Optional(CONF_MQTT_TOPIC_BASE, default=DEFAULT_MQTT_TOPIC_BASE): str,
             vol.Optional(
-                CONF_PROXY_VERIFY_SSL,
-                default=bool((previous or {}).get(CONF_PROXY_VERIFY_SSL, False)),
+                CONF_PROXY_VERIFY_SSL, default=bool(previous.get(CONF_PROXY_VERIFY_SSL, False))
             ): bool,
+            vol.Optional(CONF_MQTT_TLS, default=bool(previous.get(CONF_MQTT_TLS, False))): bool,
         }
     )
 
 
 def build_options_schema(merged: dict[str, Any]) -> vol.Schema:
-    """Build the options form schema."""
+    """Build the options form schema (same field order as the setup form)."""
     return vol.Schema(
         {
-            vol.Optional(
-                CONF_DOMAIN,
-                default=merged.get(CONF_DOMAIN, ""),
-            ): str,
+            vol.Optional(CONF_DOMAIN, default=merged.get(CONF_DOMAIN, "")): str,
             vol.Required(
                 CONF_TELEMETRY_SERVER_ENDPOINT,
                 default=(
@@ -399,33 +406,29 @@ def build_options_schema(merged: dict[str, Any]) -> vol.Schema:
                 ),
             ): str,
             vol.Required(
-                CONF_TELEMETRY_MODE,
-                default=merged.get(CONF_TELEMETRY_MODE, DEFAULT_TELEMETRY_MODE),
-            ): vol.In(TELEMETRY_MODE_OPTIONS),
+                CONF_PROXY_URL, default=display_proxy_url(merged.get(CONF_PROXY_URL, ""))
+            ): str,
             vol.Required(
                 CONF_MQTT_ENDPOINT,
                 default=(
-                    mqtt_endpoint_default(
-                        merged[CONF_MQTT_HOST],
-                        merged[CONF_MQTT_PORT],
-                    )
+                    mqtt_endpoint_default(merged[CONF_MQTT_HOST], merged[CONF_MQTT_PORT])
                     if merged.get(CONF_MQTT_HOST)
                     else ""
                 ),
             ): str,
             **mqtt_auth_schema(merged),
+            vol.Required(
+                CONF_TELEMETRY_MODE,
+                default=merged.get(CONF_TELEMETRY_MODE, DEFAULT_TELEMETRY_MODE),
+            ): _MODE_SELECTOR,
             vol.Optional(
                 CONF_MQTT_TOPIC_BASE,
                 default=merged.get(CONF_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE),
             ): str,
-            vol.Required(
-                CONF_PROXY_URL,
-                default=display_proxy_url(merged.get(CONF_PROXY_URL, "")),
-            ): str,
             vol.Optional(
-                CONF_PROXY_VERIFY_SSL,
-                default=bool(merged.get(CONF_PROXY_VERIFY_SSL, False)),
+                CONF_PROXY_VERIFY_SSL, default=bool(merged.get(CONF_PROXY_VERIFY_SSL, False))
             ): bool,
+            vol.Optional(CONF_MQTT_TLS, default=bool(merged.get(CONF_MQTT_TLS, False))): bool,
         }
     )
 
