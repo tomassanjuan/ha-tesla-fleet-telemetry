@@ -16,7 +16,10 @@ from .const import (
     CONF_DOMAIN,
     CONF_FLEET_API_BASE,
     CONF_MQTT_HOST,
+    CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
+    CONF_MQTT_TLS,
+    CONF_MQTT_USERNAME,
     CONF_PROXY_URL,
     CONF_PROXY_VERIFY_SSL,
     CONF_TELEMETRY_MODE,
@@ -47,6 +50,7 @@ from .flow_helpers import (
     parse_mqtt_endpoint,
     telemetry_config_override_requires_confirmation,
     telemetry_endpoint_changed,
+    validate_domain,
     validate_proxy_url,
     validate_telemetry_endpoint,
 )
@@ -112,6 +116,7 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
             return None
 
         proxy_url = validate_proxy_url(user_input.get(CONF_PROXY_URL, ""), errors)
+        validate_domain(str(user_input.get(CONF_DOMAIN, "") or ""), errors)
         telemetry_endpoint = str(user_input.get(CONF_TELEMETRY_SERVER_ENDPOINT, "")).strip()
         hostname, port = validate_telemetry_endpoint(telemetry_endpoint, errors)
         if errors:
@@ -128,6 +133,9 @@ class TeslaFleetTelemetryFlowHandler(  # type: ignore[call-arg]
                 normalized_input[CONF_MQTT_PORT],
                 proxy_url,
                 verify_ssl=bool(normalized_input.get(CONF_PROXY_VERIFY_SSL)),
+                mqtt_username=normalized_input.get(CONF_MQTT_USERNAME),
+                mqtt_password=normalized_input.get(CONF_MQTT_PASSWORD),
+                mqtt_tls=bool(normalized_input.get(CONF_MQTT_TLS)),
             )
         )
         if errors:
@@ -581,6 +589,7 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
 
         # Validate proxy and reachability.
         proxy_url = validate_proxy_url(user_input.get(CONF_PROXY_URL, ""), errors)
+        validate_domain(str(user_input.get(CONF_DOMAIN, "") or ""), errors)
         if not errors and proxy_url:
             user_input[CONF_PROXY_URL] = proxy_url
             errors.update(
@@ -591,6 +600,9 @@ class TeslaFleetTelemetryOptionsFlow(config_entries.OptionsFlowWithReload):
                     proxy_url,
                     timeout=DEFAULT_CONNECTION_TIMEOUT,
                     verify_ssl=bool(user_input.get(CONF_PROXY_VERIFY_SSL)),
+                    mqtt_username=user_input.get(CONF_MQTT_USERNAME),
+                    mqtt_password=user_input.get(CONF_MQTT_PASSWORD),
+                    mqtt_tls=bool(user_input.get(CONF_MQTT_TLS)),
                 )
             )
 

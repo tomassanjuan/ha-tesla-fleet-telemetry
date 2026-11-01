@@ -56,6 +56,9 @@
     "error": {
       "invalid_mqtt_endpoint": "Enter the MQTT broker as host:port.",
       "mqtt_unreachable": "Could not connect to the MQTT broker. Check the hostname, port, and firewall.",
+      "mqtt_auth_failed": "The MQTT broker rejected the username or password.",
+      "mqtt_tls_failed": "TLS handshake with the MQTT broker failed. Check the TLS setting and that the broker certificate is trusted.",
+      "invalid_domain": "Enter a bare domain such as yourdomain.com (no https://, port or path).",
       "mqtt_timeout": "Timed out connecting to the MQTT broker. Check that it is reachable from Home Assistant.",
       "proxy_empty": "Enter the Tesla HTTP proxy hostname or URL.",
       "proxy_invalid_url": "Enter a valid Tesla HTTP proxy hostname or HTTPS URL.",
@@ -121,6 +124,9 @@
     "error": {
       "invalid_mqtt_endpoint": "Enter the MQTT broker as host:port.",
       "mqtt_unreachable": "Could not connect to the MQTT broker. Check the hostname, port, and firewall.",
+      "mqtt_auth_failed": "The MQTT broker rejected the username or password.",
+      "mqtt_tls_failed": "TLS handshake with the MQTT broker failed. Check the TLS setting and that the broker certificate is trusted.",
+      "invalid_domain": "Enter a bare domain such as yourdomain.com (no https://, port or path).",
       "mqtt_timeout": "Timed out connecting to the MQTT broker. Check that it is reachable from Home Assistant.",
       "proxy_empty": "Enter the Tesla HTTP proxy hostname or URL.",
       "proxy_invalid_url": "Enter a valid Tesla HTTP proxy hostname or HTTPS URL.",
