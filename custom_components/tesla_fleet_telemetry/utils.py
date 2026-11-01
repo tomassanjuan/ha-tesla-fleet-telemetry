@@ -205,11 +205,16 @@ def extract_first_fields_config(payload: Any) -> dict[str, Any] | None:
     return None
 
 
+def _pinned_chain(chain: list[bytes]) -> list[bytes]:
+    """Return the issuing CA of a verified chain (leaf first), or the cert itself if alone."""
+    return chain[1:2] or chain[:1]
+
+
 def _fetch_server_ca_blocking(hostname: str, port: int) -> tuple[str, bool]:
     """Return (ca_pem_bundle, trusted) for a TLS server; blocking, run in an executor.
 
-    For a publicly trusted certificate the whole verified chain (leaf through
-    root) is returned, so vehicles keep trusting the server after the leaf is
+    For a publicly trusted certificate only the issuing CA (the cert that signed
+    the leaf) is returned, so vehicles keep trusting the server after the leaf is
     renewed under the same CA. Otherwise only the leaf is returned with
     trusted=False and the caller decides whether to accept it.
     """
@@ -221,7 +226,7 @@ def _fetch_server_ca_blocking(hostname: str, port: int) -> tuple[str, bool]:
         ):
             chain = ssock.get_verified_chain()
         if chain:
-            return der_cert_chain_to_pem_bundle(list(chain)), True
+            return der_cert_chain_to_pem_bundle(_pinned_chain(list(chain))), True
     except (OSError, ValueError):
         # Untrusted or hostname mismatch (SSLCertVerificationError is an OSError);
         # fall through to fetch the leaf without verification.

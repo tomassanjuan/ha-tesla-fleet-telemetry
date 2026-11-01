@@ -14,8 +14,15 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.issue_registry import async_delete_issue
 
-from .const import CONF_DOMAIN, CONF_TELEMETRY_SERVER_HOSTNAME, DOMAIN
+from .const import (
+    CONF_DOMAIN,
+    CONF_TELEMETRY_SERVER_CA,
+    CONF_TELEMETRY_SERVER_HOSTNAME,
+    CONF_TELEMETRY_SERVER_PORT,
+    DOMAIN,
+)
 from .entity_registry import _fields_for_unique_id
+from .utils import async_fetch_server_ca, normalize_pem_cert_bundle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -190,59 +197,69 @@ class UnknownFieldRepairFlow(RepairsFlow):
 
         if disabled:
             _LOGGER.info(
-                "Disabled %s entity/entities for unknown field %s on %s", disabled, field, vin
+                "Disabled %s entity/entities for unknown field %s on %s",
+                disabled,
+                field,
+                vin,
             )
         async_delete_issue(self.hass, DOMAIN, self.issue_id)
         return self.async_create_entry(title="", data={})
 
 
-class BlockerRepairFlow(RepairsFlow):
-    """Repair flow for blocking problems: explain, then retry or reload.
+async def _server_ca_changed(hass: HomeAssistant, entry_id: str) -> bool:
+    """Whether the telemetry server's trusted CA differs from the stored one."""
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None:
+        return False
+    opts = {**entry.data, **entry.options}
+    hostname = opts.get(CONF_TELEMETRY_SERVER_HOSTNAME)
+    port = opts.get(CONF_TELEMETRY_SERVER_PORT)
+    if not hostname or not isinstance(port, int):
+        return False
+    try:
+        pem, trusted = await async_fetch_server_ca(hass, hostname, port)
+    except (OSError, ValueError):
+        return False
+    try:
+        current = normalize_pem_cert_bundle(opts.get(CONF_TELEMETRY_SERVER_CA, ""))
+    except ValueError:
+        current = ""
+    return trusted and pem != current
 
-    The issue is only dismissed when a retry shows no new blocking error; if
-    Tesla still reports it, the flow says so and the issue stays.
+
+class BlockerRepairFlow(RepairsFlow):
+    """Repair flow for blocking problems: explain, then reload on Submit.
+
+    Reloading re-reads the server's certificate chain and pushes the config
+    again. The result says whether the stored CA changed; if the problem
+    persists the issue reappears by itself.
     """
 
-    def _issue(self) -> tuple[str, dict[str, str]]:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Explain the problem; on Submit reload the integration."""
         issue = ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id)
         data = issue.data if issue and isinstance(issue.data, dict) else {}
         placeholders = dict(issue.translation_placeholders or {}) if issue else {}
-        return str(data.get("vin") or ""), placeholders
-
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Explain the problem and offer the actions."""
-        _, placeholders = self._issue()
-        return self.async_show_menu(
-            step_id="init",
-            menu_options=["retry", "reload"],
-            description_placeholders=placeholders,
-        )
-
-    async def async_step_retry(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Re-push the config to Tesla and report whether the problem persists."""
-        vin, placeholders = self._issue()
+        if user_input is None:
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema({}),
+                description_placeholders=placeholders,
+            )
+        vin = str(data.get("vin") or "")
         found = _find_entry_for_vin(self.hass, vin)
         if found is None:
             return self.async_abort(reason="entry_not_found")
+        ca_changed = await _server_ca_changed(self.hass, found[0])
+        # Only errors newer than the reload count, so history from before the
+        # user's fix does not re-raise the issue.
         self.hass.data.setdefault(DOMAIN + "_blocker_retry", {})[vin] = datetime.now(UTC)
         async_delete_issue(self.hass, DOMAIN, self.issue_id)
-        try:
-            await found[1].push_telemetry_config(reason="manual")
-        except Exception as err:
-            _LOGGER.warning("Config push during blocker retry failed for %s: %s", vin, err)
-            placeholders["error"] = str(err)
-        if ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id):
-            return self.async_abort(reason="still_blocked", description_placeholders=placeholders)
-        return self.async_abort(reason="retry_sent", description_placeholders=placeholders)
-
-    async def async_step_reload(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Reload the integration (new connection, fresh config push)."""
-        vin, _ = self._issue()
-        found = _find_entry_for_vin(self.hass, vin)
-        if found is None:
-            return self.async_abort(reason="entry_not_found")
         await self.hass.config_entries.async_reload(found[0])
-        return self.async_abort(reason="reloaded")
+        return self.async_abort(
+            reason="reloaded_ca_changed" if ca_changed else "reloaded",
+            description_placeholders=placeholders,
+        )
 
 
 async def async_create_fix_flow(
