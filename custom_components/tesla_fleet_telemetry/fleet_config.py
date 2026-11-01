@@ -865,6 +865,10 @@ async def _do_push_and_sync(
         response,
     )
     if hass is not None:
+        # Errors reported before this push belong to the previous config (old CA,
+        # old server): only count newer ones, so a fixed problem does not keep
+        # (or re-raise) its repair issue.
+        hass.data.setdefault(DOMAIN + "_blocker_retry", {})[vin] = datetime.now(UTC)
         # Push-time blockers are re-raised below if Tesla still skips the vehicle.
         for kind in ("unsupported_hardware", "unsupported_firmware", "config_slots_full"):
             ir.async_delete_issue(hass, DOMAIN, _blocker_issue_id(kind, vin))
