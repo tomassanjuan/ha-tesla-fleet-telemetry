@@ -105,7 +105,7 @@ class TeslaClimate(CommandEntity, ClimateEntity):
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 15.0
     _attr_max_temp = 28.0
     _attr_target_temperature_step = 0.5
@@ -159,14 +159,14 @@ class TeslaClimate(CommandEntity, ClimateEntity):
         return HVACMode.OFF
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         value = self.coordinator.get_field("InsideTemp")
         if isinstance(value, int | float):
             return round(float(value), 1)
         return None
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return driver temp as main target temperature."""
         value = self.coordinator.get_field("HvacLeftTemperatureRequest")
         if isinstance(value, int | float):
@@ -301,7 +301,7 @@ class CabinOverheatClimate(CommandEntity, ClimateEntity):
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 30.0
     _attr_max_temp = 40.0
     _attr_target_temperature_step = 5.0
@@ -346,12 +346,12 @@ class CabinOverheatClimate(CommandEntity, ClimateEntity):
         return None
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """COP is mode-only; cabin temperature is exposed by main Climate."""
         return None
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         temp_limit = normalize_enum(
             self.coordinator.get_field("CabinOverheatProtectionTemperatureLimit"),
             prefixes=("ClimateOverheatProtectionTempLimit",),
@@ -375,7 +375,7 @@ class CabinOverheatClimate(CommandEntity, ClimateEntity):
         )
         if temp_limit is not None:
             attrs["temperature_limit"] = (
-                self.target_temperature if self.target_temperature is not None else temp_limit
+                self.native_target_temperature if self.native_target_temperature is not None else temp_limit
             )
         return attrs
 
