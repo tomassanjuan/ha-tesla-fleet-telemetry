@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ha-tesla-fleet-telemetry"
-version = "1.0.0"
+version = "0.1.0"
 description = "Tesla Fleet Telemetry integration for Home Assistant"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "Apache-2.0"}
+license = {text = "MIT"}
 authors = [
-    {name = "Tesla Fleet Telemetry Contributors"},
+    {name = "Tomas Sanjuan"},
 ]
 keywords = [
     "homeassistant",
@@ -23,7 +23,7 @@ classifiers = [
     "Environment :: Plugins",
     "Framework :: Home Assistant",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.12",

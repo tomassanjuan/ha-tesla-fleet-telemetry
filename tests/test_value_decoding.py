@@ -183,9 +183,7 @@ async def test_restored_distance_is_not_converted_twice(
 ) -> None:
     """HA stores km (display unit); native is mi. Restore must convert back."""
     description = next(d for d in DESCRIPTIONS if d.key == "RatedRange")
-    mock_restore_cache(
-        hass, [State("sensor.rated_range", "346.0", {"unit_of_measurement": "km"})]
-    )
+    mock_restore_cache(hass, [State("sensor.rated_range", "346.0", {"unit_of_measurement": "km"})])
     sensor = TelemetrySensor(coordinator, description, TEST_VIN)
     sensor.hass = hass
     sensor.entity_id = "sensor.rated_range"

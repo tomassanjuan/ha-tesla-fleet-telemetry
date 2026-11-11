@@ -13,5 +13,5 @@
     "qrcode[png]>=8.2",
     "tesla-fleet-api>=1.17.2,<2"
   ],
-  "version": "1.1.0"
+  "version": "0.1.0"
 }

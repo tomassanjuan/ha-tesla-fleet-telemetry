@@ -8,7 +8,3 @@ contact_links:
   - name: Home Assistant Community
     url: https://community.home-assistant.io
     about: Get help from the Home Assistant community
-
-  - name: Discord Community (if applicable)
-    url: https://discord.gg/your-discord
-    about: Real-time chat and support

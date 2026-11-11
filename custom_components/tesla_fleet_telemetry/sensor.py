@@ -315,9 +315,7 @@ class TelemetrySensor(TelemetryEntity, SensorEntity):
             return _to_utc_datetime(restored)
         if self._is_numeric:
             # Already post-multiplier: only undo the display-unit conversion.
-            return _restored_to_native(
-                restored, self._restored_unit, self.entity_description
-            )
+            return _restored_to_native(restored, self._restored_unit, self.entity_description)
         return restored
 
     def _process_string_value(self, val: str) -> str | float | None:

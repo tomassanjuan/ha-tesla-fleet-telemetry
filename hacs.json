@@ -1,9 +1,5 @@
 {
-  "name": "Tesla Fleet Telemetry",
-  "category": "integration",
   "homeassistant": "2026.1.0",
-  "render_readme": true,
-  "documentation": "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry",
-  "issues": "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry/issues",
-  "discussions": "https://github.com/tomassanjuan/ha-tesla-fleet-telemetry/discussions"
+  "name": "Tesla Fleet Telemetry (Self-Hosted)",
+  "render_readme": true
 }

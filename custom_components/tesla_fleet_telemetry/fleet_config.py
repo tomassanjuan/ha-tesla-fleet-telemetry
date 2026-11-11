@@ -298,7 +298,9 @@ def _raise_blocker(hass: HomeAssistant, vin: str, kind: str, target: str | None 
     _LOGGER.error("Created repair issue %s: Fleet Telemetry is blocked until you act", issue_id)
 
 
-def _clear_blockers(hass: HomeAssistant, vin: str, keep: set[str] = frozenset()) -> None:
+def _clear_blockers(
+    hass: HomeAssistant, vin: str, keep: frozenset[str] | set[str] = frozenset()
+) -> None:
     """Remove blocker issues for this VIN whose kind is not in `keep`."""
     for kind in _BLOCKER_KINDS:
         if kind not in keep:
@@ -318,9 +320,7 @@ def _response_vin_skipped_missing_key(vin: str, response: Any) -> bool:
     return vin in (skipped.get("missing_key") or [])
 
 
-def _log_push_response_skipped(
-    vin: str, response: Any, hass: HomeAssistant | None = None
-) -> None:
+def _log_push_response_skipped(vin: str, response: Any, hass: HomeAssistant | None = None) -> None:
     """Warn when Tesla's push response shows the vehicle was skipped."""
     if not isinstance(response, dict):
         return

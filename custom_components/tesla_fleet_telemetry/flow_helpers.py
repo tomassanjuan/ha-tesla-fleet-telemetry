@@ -68,6 +68,17 @@ TESLA_HTTP_ERRORS: tuple[type[BaseException], ...] = (
 )
 
 
+def _classify_mqtt_result(finished: bool, rc: list[int], tls: bool) -> tuple[bool, str | None]:
+    """Map the outcome of an MQTT connect attempt to (ok, error_key)."""
+    if not finished:
+        return False, "mqtt_timeout"
+    if not rc:  # on_connect_fail: TCP/TLS handshake error
+        return False, "mqtt_tls_failed" if tls else "mqtt_unreachable"
+    if rc[0] in (134, 135):  # bad user name or password / not authorized
+        return False, "mqtt_auth_failed"
+    return (True, None) if rc[0] == 0 else (False, "mqtt_unreachable")
+
+
 async def async_verify_mqtt_reachable(
     hass: HomeAssistant,
     host: str,
@@ -118,13 +129,7 @@ async def async_verify_mqtt_reachable(
         finally:
             client.disconnect()
             client.loop_stop()
-        if not finished:
-            return False, "mqtt_timeout"
-        if not rc:  # on_connect_fail: TCP/TLS handshake error
-            return False, "mqtt_tls_failed" if tls else "mqtt_unreachable"
-        if rc[0] in (134, 135):  # bad user name or password / not authorized
-            return False, "mqtt_auth_failed"
-        return (True, None) if rc[0] == 0 else (False, "mqtt_unreachable")
+        return _classify_mqtt_result(finished, rc, tls)
 
     return cast(tuple[bool, str | None], await hass.async_add_executor_job(_check_mqtt))
 
