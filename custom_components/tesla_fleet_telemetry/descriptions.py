@@ -547,6 +547,17 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         entity_registry_enabled_default=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    TelemetryEntityDescription(
+        key="SemiCruiseSpeedLimitMph",
+        name="Semi Cruise Speed Limit",
+        native_unit_of_measurement="mph",
+        suggested_unit_of_measurement="km/h",
+        device_class=SensorDeviceClass.SPEED,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:car-cruise-control",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     # --- Powertrain ---
     TelemetryEntityDescription(
         key="DiHeatsinkTR",
@@ -619,6 +630,35 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         entity_registry_enabled_default=True,
         entity_category=EntityCategory.DIAGNOSTIC,
         minimum_delta_override=2,
+    ),
+    TelemetryEntityDescription(
+        key="GpsAccuracyMeters",
+        name="GPS Accuracy",
+        native_unit_of_measurement="m",
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:crosshairs-gps",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="GradeEstimatePercent",
+        name="Road Grade",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:slope-uphill",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="MaxSpeedToReachDestinationMph",
+        name="Max Speed To Reach Destination",
+        native_unit_of_measurement="mph",
+        suggested_unit_of_measurement="km/h",
+        device_class=SensorDeviceClass.SPEED,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:speedometer",
     ),
     # --- Safety & Access ---
     TelemetryEntityDescription(
