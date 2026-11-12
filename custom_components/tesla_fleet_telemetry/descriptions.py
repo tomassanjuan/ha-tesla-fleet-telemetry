@@ -1990,7 +1990,7 @@ ENTITY_FIELD_MAPPINGS: dict[str, TelemetryEntityMapping] = {
     "sentry": TelemetryEntityMapping(frozenset({"SentryMode"})),
     "charge_switch": TelemetryEntityMapping(frozenset({"DetailedChargeState"})),
     "lock": TelemetryEntityMapping(frozenset({"Locked"})),
-    "remote_start_lock": TelemetryEntityMapping(frozenset({"RemoteStartEnabled"})),
+    "remote_start_lock": TelemetryEntityMapping(frozenset({"RemoteStartActive"})),
     "charge_port_cover": TelemetryEntityMapping(frozenset({"ChargePortDoorOpen"})),
     "frunk": TelemetryEntityMapping(frozenset({"DoorState"})),
     "trunk": TelemetryEntityMapping(frozenset({"DoorState"})),
