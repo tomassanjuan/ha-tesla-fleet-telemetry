@@ -119,6 +119,9 @@ module = [
     "custom_components.tesla_fleet_telemetry.config_flow",
     "custom_components.tesla_fleet_telemetry.repairs",
     "custom_components.tesla_fleet_telemetry.update",
+    "tesla_fleet_telemetry.config_flow",
+    "tesla_fleet_telemetry.repairs",
+    "tesla_fleet_telemetry.update",
 ]
 disable_error_code = ["arg-type", "return-value", "dict-item"]
 
