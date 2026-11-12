@@ -40,7 +40,6 @@ NEW_FIELDS = (
     "GpsAccuracyMeters",
     "GradeEstimatePercent",
     "MaxSpeedToReachDestinationMph",
-    "SemiCruiseSpeedLimitMph",
     "AccessoryRail",
     "AutomaticEmergencyBrakingState",
     "RollingResistanceCoefficient",
