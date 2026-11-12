@@ -281,7 +281,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         max_valid=8000.0,
         icon="mdi:resistor",
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
         minimum_delta_override=20,
     ),
@@ -445,7 +445,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:car-brake-hold",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         key="DiAxleSpeedR",
@@ -547,7 +547,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         icon="mdi:car-cruise-control",
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # --- Powertrain ---
@@ -619,7 +619,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         icon="mdi:compass",
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
         minimum_delta_override=2,
     ),
@@ -632,7 +632,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:crosshairs-gps",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         key="GradeEstimatePercent",
@@ -642,7 +642,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:slope-uphill",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         key="MaxSpeedToReachDestinationMph",
@@ -653,7 +653,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         icon="mdi:speedometer",
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     # --- Safety & Access ---
     TelemetryEntityDescription(
@@ -703,7 +703,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         key="NetworkInterface",
         name="Network Interface",
         icon="mdi:wifi",
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     TelemetryEntityDescription(
@@ -895,14 +895,14 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=4,
         icon="mdi:tire",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         key="AccessoryRail",
         name="Accessory Rail",
         icon="mdi:rail",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         key="AutomaticEmergencyBrakingState",
@@ -910,7 +910,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:car-brake-alert",
         strip_prefix="AutomaticEmergencyBrakingState",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     # --- Self-Driving Stats ---
     TelemetryEntityDescription(
@@ -1031,7 +1031,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         icon="mdi:traffic-light",
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         key="Setting24HourTime",
@@ -1400,7 +1400,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:transmission-tower-off",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     # --- Climate ---
     TelemetryEntityDescription(
@@ -1535,7 +1535,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="Drive Rail",
         icon="mdi:car-connected",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         binary=True,
@@ -1565,7 +1565,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="DCDC Enable",
         icon="mdi:current-dc",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         binary=True,
@@ -1637,7 +1637,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="Service Mode",
         icon="mdi:wrench-cog",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=True,
+        entity_registry_enabled_default=False,
     ),
     TelemetryEntityDescription(
         binary=True,
