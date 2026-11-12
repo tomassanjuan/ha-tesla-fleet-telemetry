@@ -129,6 +129,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:battery-low",
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
     ),
     TelemetryEntityDescription(
         key="NominalFullPackEnergyKwh",
@@ -140,6 +141,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:battery-heart-variant",
         entity_category=EntityCategory.DIAGNOSTIC,
         minimum_delta_override=0.1,
+        entity_registry_enabled_default=True,
     ),
     TelemetryEntityDescription(
         key="ChargeAmps",
@@ -557,6 +559,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:car-cruise-control",
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
     ),
     # --- Powertrain ---
     TelemetryEntityDescription(
@@ -640,6 +643,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:crosshairs-gps",
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
     ),
     TelemetryEntityDescription(
         key="GradeEstimatePercent",
@@ -649,6 +653,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:slope-uphill",
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
     ),
     TelemetryEntityDescription(
         key="MaxSpeedToReachDestinationMph",
@@ -659,6 +664,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         icon="mdi:speedometer",
+        entity_registry_enabled_default=True,
     ),
     # --- Safety & Access ---
     TelemetryEntityDescription(
@@ -870,6 +876,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:battery-charging-high",
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
     ),
     TelemetryEntityDescription(
         key="LifetimeEnergyGainedRegen",
@@ -880,6 +887,40 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=0,
         icon="mdi:battery-arrow-up",
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TelemetryEntityDescription(
+        key="LifetimeDcChargeEnergyKwh",
+        name="Lifetime DC Charge Energy",
+        native_unit_of_measurement="kWh",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=0,
+        icon="mdi:ev-station",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
+    ),
+    TelemetryEntityDescription(
+        key="RollingResistanceCoefficient",
+        name="Rolling Resistance Coefficient",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        icon="mdi:tire",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
+    ),
+    TelemetryEntityDescription(
+        key="AccessoryRail",
+        name="Accessory Rail",
+        icon="mdi:rail",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
+    ),
+    TelemetryEntityDescription(
+        key="AutomaticEmergencyBrakingState",
+        name="Automatic Emergency Braking State",
+        icon="mdi:car-brake-alert",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=True,
     ),
     # --- Self-Driving Stats ---
     TelemetryEntityDescription(
@@ -1591,6 +1632,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="Remote Start Active",
         device_class=BinarySensorDeviceClass.RUNNING,
         icon="mdi:car-key",
+        entity_registry_enabled_default=True,
     ),
     TelemetryEntityDescription(
         binary=True,
