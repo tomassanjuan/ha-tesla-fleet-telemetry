@@ -720,8 +720,9 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
     ),
     TelemetryEntityDescription(
         key="CurrentLimitMph",
-        name="Current Limit",
-        native_unit_of_measurement="km/h",
+        name="Current Speed Limit",
+        native_unit_of_measurement="mph",
+        suggested_unit_of_measurement="km/h",
         device_class=SensorDeviceClass.SPEED,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
