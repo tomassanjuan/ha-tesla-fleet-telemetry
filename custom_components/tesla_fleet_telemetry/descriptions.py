@@ -907,6 +907,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         key="AutomaticEmergencyBrakingState",
         name="Automatic Emergency Braking State",
         icon="mdi:car-brake-alert",
+        strip_prefix="AutomaticEmergencyBrakingState",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=True,
     ),
