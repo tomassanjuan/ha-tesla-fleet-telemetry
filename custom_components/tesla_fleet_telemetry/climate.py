@@ -375,7 +375,9 @@ class CabinOverheatClimate(CommandEntity, ClimateEntity):
         )
         if temp_limit is not None:
             attrs["temperature_limit"] = (
-                self.native_target_temperature if self.native_target_temperature is not None else temp_limit
+                self.native_target_temperature
+                if self.native_target_temperature is not None
+                else temp_limit
             )
         return attrs
 
