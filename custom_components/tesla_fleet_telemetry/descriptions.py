@@ -125,6 +125,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         key="BrickSocMinPercent",
         name="Brick SoC Min",
         native_unit_of_measurement="%",
+        device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         icon="mdi:battery-low",
