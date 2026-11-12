@@ -31,7 +31,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "paho-mqtt>=2.1.0,<3",
+    "paho-mqtt>=2.2.0,<3",
+    "qrcode[png]>=8.2",
+    "tesla-fleet-api>=1.23.0,<2",
     "aiohttp>=3.13.3,<4",
 ]
 
