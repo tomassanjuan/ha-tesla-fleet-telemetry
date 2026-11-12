@@ -53,7 +53,7 @@ The docs are compact but complete:
 - [Usage](docs/USAGE.md): entities, commands, telemetry modes, automations, and maintenance.
 - [Troubleshooting](docs/TROUBLESHOOTING.md): fast checks, common errors, and recovery runbooks.
 - [Security and Privacy](docs/SECURITY.md): secrets, MQTT, certificates, commands, and location data.
-- [Architecture](docs/ARCHITECTURE.md): component layout and data flow. Historical audit notes live in [docs/dev](docs/dev/).
+- [Architecture](docs/ARCHITECTURE.md): component layout and data flow.
 
 ## Basic Flow
 
