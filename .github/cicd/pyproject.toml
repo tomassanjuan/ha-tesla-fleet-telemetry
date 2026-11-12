@@ -112,6 +112,16 @@ disallow_untyped_decorators = false
 module = "homeassistant.*"
 ignore_missing_imports = true
 
+# HA 2026.11 typed flow schemas as probatio, not voluptuous; keep older-HA compat
+# ponytail: drop once all supported HA versions use probatio
+[[tool.mypy.overrides]]
+module = [
+    "custom_components.tesla_fleet_telemetry.config_flow",
+    "custom_components.tesla_fleet_telemetry.repairs",
+    "custom_components.tesla_fleet_telemetry.update",
+]
+disable_error_code = ["arg-type", "return-value", "dict-item"]
+
 [[tool.mypy.overrides]]
 module = "paho.*"
 ignore_missing_imports = true
