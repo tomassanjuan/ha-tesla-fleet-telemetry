@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-orange.svg" alt="HACS custom repository"></a>
-  <img src="https://img.shields.io/badge/Home%20Assistant-2026.11+-brightgreen" alt="Home Assistant 2026.1+">
+  <img src="https://img.shields.io/badge/Home%20Assistant-2026.1+-brightgreen" alt="Home Assistant 2026.1+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT licence"></a>
 </p>
 
@@ -37,7 +37,7 @@ This is a custom integration. It is not part of Home Assistant Core and is not a
 
 ## What You Need
 
-- Home Assistant 2026.11 or newer.
+- Home Assistant 2026.1 or newer.
 - A Tesla account with access to the vehicle.
 - Tesla application credentials and vehicle permissions.
 - A public hostname for the telemetry receiver.

@@ -20,7 +20,7 @@ You run the proxy, telemetry receiver, and MQTT broker. Home Assistant connects 
 
 ## Requirements
 
-- Home Assistant 2026.11 or newer.
+- Home Assistant 2026.1 or newer.
 - Tesla account with access to the vehicle.
 - Tesla application credentials with the vehicle permissions you need.
 - Public DNS name for the telemetry receiver.

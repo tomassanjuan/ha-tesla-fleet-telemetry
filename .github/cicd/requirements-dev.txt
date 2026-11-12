@@ -6,7 +6,7 @@ paho-mqtt>=2.2.0
 tesla-fleet-api>=1.23.0,<2
 
 # Home Assistant (for type hints)
-homeassistant>=2026.11.0
+homeassistant>=2026.1.0
 
 # Linting & formatting
 ruff>=0.17.0
