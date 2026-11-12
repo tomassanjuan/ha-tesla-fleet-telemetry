@@ -235,3 +235,12 @@ async def test_cancelled_wake_caller_does_not_start_second_wake(hass: HomeAssist
     assert calls == 1
     await hass.async_block_till_done()
     assert client._wake_task is None
+
+
+def test_charge_port_interval_respects_tesla_minimum() -> None:
+    """Tesla only authorizes ChargePort at >=60s; asking for 1s spams MQTT errors."""
+    from custom_components.tesla_fleet_telemetry.policy import default_field_policy
+
+    for mode in ("realtime", "normal", "low"):
+        policy = default_field_policy("ChargePort", TelemetryPolicyContext(telemetry_mode=mode))
+        assert policy["interval_seconds"] == 60

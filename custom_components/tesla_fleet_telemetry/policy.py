@@ -13,6 +13,7 @@ from .const import (
     DEFAULT_TELEMETRY_MODE,
     DEVICE_METADATA_FIELDS,
     RUNTIME_INTERVAL_OVERRIDES,
+    MIN_INTERVAL_SECONDS,
     STATIC_METADATA_INTERVAL_SECONDS,
     TelemetryMode,
 )
@@ -95,6 +96,9 @@ def interval_seconds_for_field(field: str, desc: Any, context: TelemetryPolicyCo
         override = runtime_interval_overrides.get(field)
         if isinstance(override, int):
             return override
+
+    if field in MIN_INTERVAL_SECONDS:
+        return MIN_INTERVAL_SECONDS[field]
 
     if field in INSTANT_FIELDS:
         return 1

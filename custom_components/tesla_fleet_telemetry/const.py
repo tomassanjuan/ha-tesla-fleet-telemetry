@@ -53,6 +53,10 @@ DEVICE_METADATA_FIELDS: frozenset[str] = frozenset(
     {"VehicleName", "CarType", "EfficiencyPackage", "Version"}
 )
 
+# Fields Tesla refuses below this interval. It reports the refusal asynchronously on the
+# MQTT errors topic (after the config push was accepted), so the push-time retry never sees it.
+MIN_INTERVAL_SECONDS: dict[str, int] = {"ChargePort": 60}
+
 # MQTT client tuning
 MQTT_BACKOFF_BASE_SECONDS = 1
 MQTT_BACKOFF_MAX_SECONDS = 60
