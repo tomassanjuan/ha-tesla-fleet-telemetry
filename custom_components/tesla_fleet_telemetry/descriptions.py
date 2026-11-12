@@ -898,6 +898,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         entity_registry_enabled_default=True,
     ),
     TelemetryEntityDescription(
+        binary=True,
         key="AccessoryRail",
         name="Accessory Rail",
         icon="mdi:rail",
