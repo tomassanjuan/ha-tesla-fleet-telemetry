@@ -64,9 +64,9 @@ class TeslaVehicleLock(CommandEntity, LockEntity):
 class TeslaRemoteStartLock(CommandEntity, LockEntity):
     """Remote start control as a lock-like safety action."""
 
-    _attr_name = "Keyless"
+    _attr_name = "Remote Start"
     _attr_icon = "mdi:car-key"
-    _state_fields = ("RemoteStartEnabled",)
+    _state_fields = ("RemoteStartActive",)
     _attr_entity_registry_enabled_default = True
 
     def __init__(self, coordinator, vin, proxy_client, impl, entry) -> None:
@@ -75,7 +75,8 @@ class TeslaRemoteStartLock(CommandEntity, LockEntity):
 
     @property
     def is_locked(self) -> bool | None:
-        return coerce_bool(self.coordinator.get_field("RemoteStartEnabled"))
+        active = coerce_bool(self.coordinator.get_field("RemoteStartActive"))
+        return None if active is None else not active
 
     async def async_unlock(self, **kwargs) -> None:
         await self._send_command("remote_start_drive")

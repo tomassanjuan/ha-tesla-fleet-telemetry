@@ -31,7 +31,7 @@ from __future__ import annotations
 
 CORE_CONTROLS: dict[str, set[str]] = {
     "lock": {"Locked"},
-    "remote_start": {"RemoteStartEnabled"},
+    "remote_start": {"RemoteStartEnabled", "RemoteStartActive"},
     "sentry": {"SentryMode"},
     "charge": {
         "ChargeState",
