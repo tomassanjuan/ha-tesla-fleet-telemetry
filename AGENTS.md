@@ -22,6 +22,7 @@ CI also runs pre-commit (`.github/.pre-commit-config.yaml`), hassfest, HACS vali
 - Entity `unique_id` must be VIN-scoped: use `telemetry_unique_id(vin, key)`. Multiple vehicles = multiple config entries.
 - Telemetry fields are requested from Tesla only for enabled entities (`ENTITY_FIELD_MAPPINGS`); a new entity needs a mapping or it will never receive data.
 - User-facing strings go in `strings.json` and `translations/`; keep them in sync.
+- Home Assistant core pins `paho-mqtt` and `tesla-fleet-api` to exact versions; hassfest and the dev install fail if our floors exceed them, so don't raise those floors past what current HA ships.
 - Dependency pins live in three places that must match: `manifest.json`, `.github/cicd/requirements-security.txt`, `.github/cicd/requirements-dev.txt` (plus `pyproject.toml`).
 - Never log or commit secrets (tokens, MQTT credentials, VINs in diagnostics are redacted); see `docs/SECURITY.md`.
 - Add a `CHANGELOG.md` entry for user-visible changes.
