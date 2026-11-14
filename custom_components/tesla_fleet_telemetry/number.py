@@ -1,11 +1,11 @@
-"""Number platform — Charge limit and Charge amps."""
+"""Number platform — Charge limit, Charge amps and Speed limit."""
 
 from __future__ import annotations
 
 import asyncio
 from typing import Any
 
-from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -32,6 +32,7 @@ async def async_setup_entry(
         [
             ChargeLimitNumber(coordinator, vin, proxy_client, impl, entry),
             ChargeAmpsNumber(coordinator, vin, proxy_client, impl, entry),
+            SpeedLimitNumber(coordinator, vin, proxy_client, impl, entry),
         ]
     )
 
@@ -138,3 +139,37 @@ class ChargeAmpsNumber(CommandEntity, NumberEntity):
         amps = int(max(self._attr_native_min_value, min(value, self._attr_native_max_value)))
         await self._send_command("set_charging_amps", {"charging_amps": amps})
         self.coordinator.async_update_field("ChargeCurrentRequest", amps)
+
+
+class SpeedLimitNumber(CommandEntity, NumberEntity):
+    """Set the Speed Limit Mode maximum (Tesla accepts 50-90 mph)."""
+
+    _attr_name = "Speed Limit"
+    _attr_icon = "mdi:speedometer-slow"
+    _state_fields = ("CurrentLimitMph",)
+    _attr_device_class = NumberDeviceClass.SPEED
+    _attr_native_min_value = 50
+    _attr_native_max_value = 90
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = "mph"
+    _attr_mode = NumberMode.SLIDER
+    _attr_entity_registry_enabled_default = True
+
+    def __init__(self, coordinator, vin, proxy_client, impl, entry) -> None:
+        super().__init__(coordinator, vin, proxy_client, impl, entry)
+        self._attr_unique_id = telemetry_unique_id(self._vin, "speed_limit")
+
+    @property
+    def native_value(self) -> float | None:
+        val = self.coordinator.get_field("CurrentLimitMph")
+        if isinstance(val, bool) or not isinstance(val, int | float | str):
+            return None
+        try:
+            mph = float(val)
+        except ValueError:
+            return None
+        # The car reports the active limit (also e.g. 0/other when unset); stay in range.
+        return mph if self._attr_native_min_value <= mph <= self._attr_native_max_value else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self._send_command("speed_limit_set_limit", {"limit_mph": int(value)})
