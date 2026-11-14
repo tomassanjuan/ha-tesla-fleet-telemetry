@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Speed Limit number entity to set Speed Limit Mode's maximum speed (`speed_limit_set_limit`).
+- Speed Limit number entity to set Speed Limit Mode's maximum speed (`speed_limit_set_limit`). It replaces the read-only "Current Speed Limit" sensor.
 
 ## 0.1.0 - 2026-11-11
 

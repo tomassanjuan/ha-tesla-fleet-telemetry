@@ -720,6 +720,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
     ),
     TelemetryEntityDescription(
         key="CurrentLimitMph",
+        has_dedicated_entity=True,
         name="Current Speed Limit",
         native_unit_of_measurement="mph",
         suggested_unit_of_measurement="km/h",
