@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed the `Accessory Rail` binary sensor showing no icon: it used `mdi:rail`, which doesn't exist in Material Design Icons. It now uses `mdi:power-plug`.
 - Speed Limit number entity to set Speed Limit Mode's maximum speed (`speed_limit_set_limit`). It replaces the read-only "Current Speed Limit" sensor.
 - Removed the duplicate `Remote Start Active` binary sensor; the `Remote Start` lock already reports the same state. Delete the orphaned entity from the registry if it remains.
 
