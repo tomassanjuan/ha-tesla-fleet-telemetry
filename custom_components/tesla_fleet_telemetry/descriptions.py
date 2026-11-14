@@ -1622,6 +1622,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
     TelemetryEntityDescription(
         binary=True,
         key="RemoteStartActive",
+        has_dedicated_entity=True,
         name="Remote Start Active",
         device_class=BinarySensorDeviceClass.RUNNING,
         icon="mdi:car-key",
