@@ -720,6 +720,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
     ),
     TelemetryEntityDescription(
         key="CurrentLimitMph",
+        has_dedicated_entity=True,
         name="Current Speed Limit",
         native_unit_of_measurement="mph",
         suggested_unit_of_measurement="km/h",
@@ -2019,6 +2020,7 @@ ENTITY_FIELD_MAPPINGS: dict[str, TelemetryEntityMapping] = {
         frozenset({"HvacSteeringWheelHeatLevel", "HvacSteeringWheelHeatAuto"})
     ),
     "charge_limit": TelemetryEntityMapping(frozenset({"ChargeLimitSoc"})),
+    "speed_limit": TelemetryEntityMapping(frozenset({"CurrentLimitMph"})),
     "charge_amps": TelemetryEntityMapping(
         frozenset({"ChargeCurrentRequest", "ChargeCurrentRequestMax"})
     ),
