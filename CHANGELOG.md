@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Speed Limit number entity to set Speed Limit Mode's maximum speed (`speed_limit_set_limit`).
+
 ## 0.1.0 - 2026-11-11
 
 First public release.

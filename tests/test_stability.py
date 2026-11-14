@@ -159,6 +159,16 @@ async def test_charge_limit_ignores_non_numeric(coordinator: TelemetryCoordinato
     assert entity.native_value is None
 
 
+async def test_speed_limit_number_range(coordinator: TelemetryCoordinator) -> None:
+    from custom_components.tesla_fleet_telemetry.number import SpeedLimitNumber
+
+    entity = SpeedLimitNumber(coordinator, TEST_VIN, MagicMock(), MagicMock(), MagicMock())
+    coordinator.async_update_field("CurrentLimitMph", 78)
+    assert entity.native_value == 78
+    coordinator.async_update_field("CurrentLimitMph", 0)
+    assert entity.native_value is None
+
+
 async def test_failing_listener_does_not_block_others(
     coordinator: TelemetryCoordinator,
 ) -> None:

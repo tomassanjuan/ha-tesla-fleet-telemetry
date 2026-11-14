@@ -26,7 +26,7 @@ Charging:
 - Battery percentage and estimated range.
 - Charge power, voltage, amps, and time remaining.
 - Start and stop charging.
-- Charge limit and charge amps where supported.
+- Charge limit, charge amps and speed limit (Speed Limit Mode, 50–90 mph) where supported.
 - Charge port state and charge port commands.
 
 Climate:

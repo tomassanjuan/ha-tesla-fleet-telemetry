@@ -2018,6 +2018,7 @@ ENTITY_FIELD_MAPPINGS: dict[str, TelemetryEntityMapping] = {
         frozenset({"HvacSteeringWheelHeatLevel", "HvacSteeringWheelHeatAuto"})
     ),
     "charge_limit": TelemetryEntityMapping(frozenset({"ChargeLimitSoc"})),
+    "speed_limit": TelemetryEntityMapping(frozenset({"CurrentLimitMph"})),
     "charge_amps": TelemetryEntityMapping(
         frozenset({"ChargeCurrentRequest", "ChargeCurrentRequestMax"})
     ),
