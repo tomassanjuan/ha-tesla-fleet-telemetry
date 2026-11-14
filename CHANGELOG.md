@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Removed the duplicate `Remote Start Active` binary sensor; the `Remote Start` lock already reports the same state. Delete the orphaned entity from the registry if it remains.
+
 ## 0.1.0 - 2026-11-11
 
 First public release.
