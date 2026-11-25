@@ -26,6 +26,8 @@ from tesla_fleet_api.exceptions import TeslaFleetError
 
 from .const import (
     CONF_DOMAIN,
+    CONF_HIDE_FRONT_DRIVE_UNIT,
+    CONF_HIDE_POWERSHARE,
     CONF_MQTT_HOST,
     CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
@@ -42,6 +44,7 @@ from .const import (
     DEFAULT_MQTT_TOPIC_BASE,
     DEFAULT_TELEMETRY_MODE,
     DEFAULT_TELEMETRY_SERVER_ENDPOINT,
+    HIDE_DEFAULT,
     TELEMETRY_MODE_OPTIONS,
 )
 from .oauth2 import (
@@ -393,6 +396,13 @@ def build_user_schema(
                 CONF_PROXY_VERIFY_SSL, default=bool(previous.get(CONF_PROXY_VERIFY_SSL, False))
             ): bool,
             vol.Optional(CONF_MQTT_TLS, default=bool(previous.get(CONF_MQTT_TLS, False))): bool,
+            vol.Optional(
+                CONF_HIDE_FRONT_DRIVE_UNIT,
+                default=bool(previous.get(CONF_HIDE_FRONT_DRIVE_UNIT, HIDE_DEFAULT)),
+            ): bool,
+            vol.Optional(
+                CONF_HIDE_POWERSHARE, default=bool(previous.get(CONF_HIDE_POWERSHARE, HIDE_DEFAULT))
+            ): bool,
         }
     )
 
@@ -434,6 +444,13 @@ def build_options_schema(merged: dict[str, Any]) -> vol.Schema:
                 CONF_PROXY_VERIFY_SSL, default=bool(merged.get(CONF_PROXY_VERIFY_SSL, False))
             ): bool,
             vol.Optional(CONF_MQTT_TLS, default=bool(merged.get(CONF_MQTT_TLS, False))): bool,
+            vol.Optional(
+                CONF_HIDE_FRONT_DRIVE_UNIT,
+                default=bool(merged.get(CONF_HIDE_FRONT_DRIVE_UNIT, HIDE_DEFAULT)),
+            ): bool,
+            vol.Optional(
+                CONF_HIDE_POWERSHARE, default=bool(merged.get(CONF_HIDE_POWERSHARE, HIDE_DEFAULT))
+            ): bool,
         }
     )
 

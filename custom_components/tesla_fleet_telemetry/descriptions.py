@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
+from .const import CONF_HIDE_FRONT_DRIVE_UNIT, CONF_HIDE_POWERSHARE
 from .polling_profiles import INSTANT_FIELDS as CONTROL_REALTIME_FIELDS
 
 # ---------------------------------------------------------------------------
@@ -53,6 +54,325 @@ class TelemetryEntityDescription(SensorEntityDescription):
     min_valid: float | None = None
     # Explicit minimum_delta override. "auto" derives from display precision.
     minimum_delta_override: float | None | Literal["auto"] = "auto"
+    # Only create the entity for these vehicle models (lowercase alphanumeric tokens matched
+    # against CarType, e.g. "cybertruck"). None = every model. See device.vehicle_model.
+    models: frozenset[str] | None = None
+    # Options key of a "hide" checkbox; when the user ticks it the entity is not created.
+    hide_option: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Model-specific entity descriptions (Cybertruck, Semi, multi-motor, front motor)
+# ---------------------------------------------------------------------------
+
+_CYBERTRUCK = frozenset({"cybertruck"})
+_SEMI = frozenset({"semi"})
+# Vehicles with a rear-left/rear-right motor pair (Plaid S/X, Cyberbeast).
+_DUAL_REAR_MOTOR = frozenset({"models", "modelx", "cybertruck"})
+_DIAG = EntityCategory.DIAGNOSTIC
+
+
+def _drive_unit(
+    suffix: str, label: str, models: frozenset[str] | None, hide_option: str | None = None
+) -> tuple[TelemetryEntityDescription, ...]:
+    """Drive-unit sensors for one motor (Di*F, Di*REL, Di*RER); disabled by default."""
+    temp = {
+        "native_unit_of_measurement": "°C",
+        "device_class": SensorDeviceClass.TEMPERATURE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "suggested_display_precision": 0,
+        "icon": "mdi:thermometer",
+    }
+    return (
+        TelemetryEntityDescription(
+            key=f"DiAxleSpeed{suffix}",
+            name=f"{label} Axle Speed",
+            native_unit_of_measurement="rpm",
+            state_class=SensorStateClass.MEASUREMENT,
+            suggested_display_precision=0,
+            icon="mdi:rotate-right",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+        ),
+        TelemetryEntityDescription(
+            key=f"DiMotorCurrent{suffix}",
+            name=f"{label} Motor Current",
+            native_unit_of_measurement="A",
+            device_class=SensorDeviceClass.CURRENT,
+            state_class=SensorStateClass.MEASUREMENT,
+            suggested_display_precision=0,
+            icon="mdi:current-dc",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+        ),
+        TelemetryEntityDescription(
+            key=f"DiTorqueActual{suffix}",
+            name=f"{label} Motor Torque",
+            native_unit_of_measurement="Nm",
+            state_class=SensorStateClass.MEASUREMENT,
+            suggested_display_precision=0,
+            value_multiplier=0.1,
+            icon="mdi:engine",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+        ),
+        TelemetryEntityDescription(
+            key=f"DiVBat{suffix}",
+            name=f"{label} Inverter DC Voltage",
+            native_unit_of_measurement="V",
+            device_class=SensorDeviceClass.VOLTAGE,
+            state_class=SensorStateClass.MEASUREMENT,
+            suggested_display_precision=1,
+            icon="mdi:flash",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+        ),
+        TelemetryEntityDescription(
+            key=f"DiHeatsinkT{suffix}",
+            name=f"{label} Heatsink Temp",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+            **temp,
+        ),
+        TelemetryEntityDescription(
+            key=f"DiInverterT{suffix}",
+            name=f"{label} Inverter Temp",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+            **temp,
+        ),
+        TelemetryEntityDescription(
+            key=f"DiStatorTemp{suffix}",
+            name=f"{label} Stator Temp",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+            **temp,
+        ),
+        TelemetryEntityDescription(
+            key=f"DiState{suffix}",
+            name=f"{label} Drive Inverter State",
+            icon="mdi:engine-outline",
+            strip_prefix="DriveInverterState",
+            entity_category=_DIAG,
+            models=models,
+            hide_option=hide_option,
+        ),
+    )
+
+
+_MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
+    *_drive_unit("F", "Front", None, CONF_HIDE_FRONT_DRIVE_UNIT),
+    *_drive_unit("REL", "Rear Left", _DUAL_REAR_MOTOR),
+    *_drive_unit("RER", "Rear Right", _DUAL_REAR_MOTOR),
+    TelemetryEntityDescription(
+        key="DiSlaveTorqueCmd",
+        name="Slave Motor Torque Command",
+        native_unit_of_measurement="Nm",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:engine",
+        entity_category=_DIAG,
+    ),
+    TelemetryEntityDescription(
+        key="ScheduledDepartureTime",
+        name="Scheduled Departure Time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:clock-outline",
+        entity_category=_DIAG,
+    ),
+    TelemetryEntityDescription(
+        key="SelfDrivingSoftwareVersion",
+        name="Self-Driving Software Version",
+        icon="mdi:steering",
+        entity_category=_DIAG,
+    ),
+    TelemetryEntityDescription(
+        key="PowerTransferStatus",
+        name="Power Transfer Status",
+        icon="mdi:transmission-tower-export",
+        entity_category=_DIAG,
+        hide_option=CONF_HIDE_POWERSHARE,
+    ),
+    # --- Cybertruck: tonneau cover ---
+    TelemetryEntityDescription(
+        key="TonneauOpenPercent",
+        name="Tonneau Open",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:truck-cargo-container",
+        entity_category=_DIAG,
+        models=_CYBERTRUCK,
+    ),
+    TelemetryEntityDescription(
+        key="TonneauPosition",
+        name="Tonneau Position",
+        icon="mdi:truck-cargo-container",
+        strip_prefix="TonneauPosition",
+        entity_category=_DIAG,
+        models=_CYBERTRUCK,
+    ),
+    TelemetryEntityDescription(
+        key="TonneauTentMode",
+        name="Tonneau Tent Mode",
+        icon="mdi:tent",
+        strip_prefix="TonneauTentMode",
+        entity_category=_DIAG,
+        models=_CYBERTRUCK,
+    ),
+    # --- Powershare (Cybertruck, and Model 3/Y from 2026): hide via options ---
+    TelemetryEntityDescription(
+        key="PowershareHoursLeft",
+        name="Powershare Hours Left",
+        native_unit_of_measurement="h",
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:timer-outline",
+        hide_option=CONF_HIDE_POWERSHARE,
+    ),
+    TelemetryEntityDescription(
+        key="PowershareInstantaneousPowerKW",
+        name="Powershare Power",
+        native_unit_of_measurement="kW",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:transmission-tower-export",
+        hide_option=CONF_HIDE_POWERSHARE,
+    ),
+    TelemetryEntityDescription(
+        key="PowershareStatus",
+        name="Powershare Status",
+        icon="mdi:transmission-tower-export",
+        strip_prefix="PowershareState",
+        hide_option=CONF_HIDE_POWERSHARE,
+    ),
+    TelemetryEntityDescription(
+        key="PowershareStopReason",
+        name="Powershare Stop Reason",
+        icon="mdi:transmission-tower-off",
+        strip_prefix="PowershareStopReasonStatus",
+        entity_category=_DIAG,
+        hide_option=CONF_HIDE_POWERSHARE,
+    ),
+    TelemetryEntityDescription(
+        key="PowershareType",
+        name="Powershare Type",
+        icon="mdi:home-lightning-bolt",
+        strip_prefix="PowershareTypeStatus",
+        entity_category=_DIAG,
+        hide_option=CONF_HIDE_POWERSHARE,
+    ),
+    # --- Semi ---
+    *(
+        TelemetryEntityDescription(
+            key=f"SemitruckTpmsPressureRe{axle}{side}{n}",
+            name=f"Semi TPMS Axle {axle} {side}{n}",
+            native_unit_of_measurement="bar",
+            device_class=SensorDeviceClass.PRESSURE,
+            state_class=SensorStateClass.MEASUREMENT,
+            suggested_display_precision=2,
+            icon="mdi:tire",
+            models=_SEMI,
+        )
+        for axle in (1, 2)
+        for side in ("L", "R")
+        for n in (0, 1)
+    ),
+    TelemetryEntityDescription(
+        key="SemitruckPassengerSeatFoldPosition",
+        name="Semi Passenger Seat Fold Position",
+        icon="mdi:seat-passenger",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        key="SemitruckTractorParkBrakeStatus",
+        name="Semi Tractor Park Brake",
+        icon="mdi:car-brake-parking",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        key="SemitruckTrailerParkBrakeStatus",
+        name="Semi Trailer Park Brake",
+        icon="mdi:car-brake-parking",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        key="LifetimeEnergyUsedDrive",
+        name="Lifetime Drive Energy Used",
+        native_unit_of_measurement="kWh",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=0,
+        icon="mdi:lightning-bolt-circle",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        key="SemiCruiseSpeedLimitMph",
+        name="Semi Cruise Speed Limit",
+        native_unit_of_measurement="mph",
+        suggested_unit_of_measurement="km/h",
+        device_class=SensorDeviceClass.SPEED,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:car-cruise-control",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        key="SemiVehicleMassKg",
+        name="Semi Vehicle Mass",
+        native_unit_of_measurement="kg",
+        device_class=SensorDeviceClass.WEIGHT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        icon="mdi:weight",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="SemiCruiseActive",
+        name="Semi Cruise Active",
+        icon="mdi:car-cruise-control",
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="SemiTrailerLatched",
+        name="Semi Trailer Latched",
+        icon="mdi:truck-trailer",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="Cabin12vPortKeepOn",
+        name="Cabin 12V Port Keep On",
+        icon="mdi:power-socket",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+    TelemetryEntityDescription(
+        binary=True,
+        key="Cabin48vPortKeepOn",
+        name="Cabin 48V Port Keep On",
+        icon="mdi:power-socket",
+        entity_category=_DIAG,
+        models=_SEMI,
+    ),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1836,6 +2156,7 @@ DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:bell-alert",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    *_MODEL_DESCRIPTIONS,
 )
 
 # ---------------------------------------------------------------------------

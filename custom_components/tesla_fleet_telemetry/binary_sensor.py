@@ -27,7 +27,7 @@ from .descriptions import (
     DESCRIPTIONS,
     TelemetryEntityDescription,
 )
-from .device import build_device_info
+from .device import build_device_info, description_applies, vehicle_model
 from .entity_base import TelemetryEntity, telemetry_unique_id
 from .fleet_config import PolicyState
 from .utils import coerce_bool, door_state_tokens
@@ -66,10 +66,14 @@ async def async_setup_entry(
     vin: str = entry_data.vin
     policy_state: PolicyState = entry_data.policy_state
 
+    model = vehicle_model(hass, coordinator, vin)
+    options = {**entry.data, **entry.options}
     entities: list[BinarySensorEntity] = [
         TelemetryBinarySensor(coordinator, description, vin)
         for description in DESCRIPTIONS
-        if description.binary and not description.has_dedicated_entity
+        if description.binary
+        and not description.has_dedicated_entity
+        and description_applies(description, model, options)
     ]
     entities.extend(TeslaDoorStateBinarySensor(coordinator, vin, *args) for args in _DOOR_SENSORS)
     entities.extend(

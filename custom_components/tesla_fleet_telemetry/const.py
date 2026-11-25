@@ -97,6 +97,11 @@ CONF_MQTT_PASSWORD = "mqtt_password"
 CONF_MQTT_TLS = "mqtt_tls"
 CONF_PROXY_URL = "proxy_url"
 CONF_PROXY_VERIFY_SSL = "proxy_verify_ssl"
+# Options: hide entity groups the user does not want (RWD car, no Powershare).
+CONF_HIDE_FRONT_DRIVE_UNIT = "hide_front_drive_unit"
+CONF_HIDE_POWERSHARE = "hide_powershare"
+# Hide groups are on unless the user unticks them (missing option = hidden).
+HIDE_DEFAULT = True
 CONF_CLIENT_ID = "client_id"
 CONF_CLIENT_SECRET = "client_secret"
 CONF_DOMAIN = "domain"

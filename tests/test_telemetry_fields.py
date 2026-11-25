@@ -24,6 +24,7 @@ from custom_components.tesla_fleet_telemetry.descriptions import (
     FIELD_DEFS,
     SUPPORTED_STREAMING_FIELDS,
 )
+from custom_components.tesla_fleet_telemetry.device import description_applies, vehicle_model
 from custom_components.tesla_fleet_telemetry.mqtt_client import TeslaMQTTClient
 from custom_components.tesla_fleet_telemetry.update import TeslaFirmwareUpdate
 
@@ -212,3 +213,57 @@ async def test_mqtt_messages_are_batched_in_order(hass: HomeAssistant) -> None:
 
     assert call_soon.call_count == 1
     assert received == [("Soc", 80), ("Odometer", 1000), ("Soc", 81)]
+
+
+# --- Model-specific entities ------------------------------------------------
+
+
+def test_model_specific_fields_are_streamable() -> None:
+    for field in (
+        "TonneauPosition",
+        "PowershareStatus",
+        "SemiCruiseActive",
+        "DiStateREL",
+        "DiStateF",
+    ):
+        assert field in FIELD_DEFS and field in SUPPORTED_STREAMING_FIELDS, field
+    for junk in ("Deprecated_1", "Experimental_1"):
+        assert junk not in FIELD_DEFS
+
+
+async def test_vehicle_model_filters_descriptions(
+    hass: HomeAssistant, coordinator: TelemetryCoordinator
+) -> None:
+    ct, semi = FIELD_DEFS["TonneauPosition"], FIELD_DEFS["SemiCruiseActive"]
+    assert vehicle_model(hass, coordinator, TEST_VIN) is None
+    show = {"hide_front_drive_unit": False}
+    assert not description_applies(ct, None)  # unknown model hides restricted entities
+    assert description_applies(FIELD_DEFS["DiStateF"], None, show)  # unrestricted always shown
+
+    coordinator.async_update_field("CarType", "cybertruck")
+    model = vehicle_model(hass, coordinator, TEST_VIN)
+    assert model == "cybertruck"
+    assert description_applies(ct, model)
+    assert description_applies(FIELD_DEFS["DiStateREL"], model)
+    assert not description_applies(semi, model)
+
+    coordinator.async_update_field("CarType", "ModelName Model Y")
+    model = vehicle_model(hass, coordinator, TEST_VIN)
+    assert not description_applies(ct, model)
+    assert not description_applies(FIELD_DEFS["DiStateREL"], model)
+    assert description_applies(FIELD_DEFS["DiStateF"], model, show)
+
+
+async def test_hide_options_filter_descriptions(
+    hass: HomeAssistant, coordinator: TelemetryCoordinator
+) -> None:
+    coordinator.async_update_field("CarType", "cybertruck")
+    model = vehicle_model(hass, coordinator, TEST_VIN)
+    front, power = FIELD_DEFS["DiStateF"], FIELD_DEFS["PowershareStatus"]
+    off = {"hide_front_drive_unit": False, "hide_powershare": False}
+    assert not description_applies(front, model, {}) and not description_applies(power, model)
+    assert description_applies(front, model, off) and description_applies(power, model, off)
+    assert not description_applies(front, model, {**off, "hide_front_drive_unit": True})
+    assert description_applies(power, "modely", off)  # Powershare is not Cybertruck-only
+    assert description_applies(FIELD_DEFS["DiStateREL"], model, {})
+    assert not FIELD_DEFS["PowershareStatus"].entity_registry_enabled_default
