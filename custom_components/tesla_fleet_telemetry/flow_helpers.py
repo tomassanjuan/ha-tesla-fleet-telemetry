@@ -396,6 +396,13 @@ def build_user_schema(
                 CONF_PROXY_VERIFY_SSL, default=bool(previous.get(CONF_PROXY_VERIFY_SSL, False))
             ): bool,
             vol.Optional(CONF_MQTT_TLS, default=bool(previous.get(CONF_MQTT_TLS, False))): bool,
+            vol.Optional(
+                CONF_HIDE_FRONT_DRIVE_UNIT,
+                default=bool(previous.get(CONF_HIDE_FRONT_DRIVE_UNIT, HIDE_DEFAULT)),
+            ): bool,
+            vol.Optional(
+                CONF_HIDE_POWERSHARE, default=bool(previous.get(CONF_HIDE_POWERSHARE, HIDE_DEFAULT))
+            ): bool,
         }
     )
 
