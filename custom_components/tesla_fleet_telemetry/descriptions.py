@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
+from .const import CONF_HIDE_FRONT_DRIVE_UNIT, CONF_HIDE_POWERSHARE
 from .polling_profiles import INSTANT_FIELDS as CONTROL_REALTIME_FIELDS
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,8 @@ class TelemetryEntityDescription(SensorEntityDescription):
     # Only create the entity for these vehicle models (lowercase alphanumeric tokens matched
     # against CarType, e.g. "cybertruck"). None = every model. See device.vehicle_model.
     models: frozenset[str] | None = None
+    # Options key of a "hide" checkbox; when the user ticks it the entity is not created.
+    hide_option: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +73,7 @@ _DIAG = EntityCategory.DIAGNOSTIC
 
 
 def _drive_unit(
-    suffix: str, label: str, models: frozenset[str] | None
+    suffix: str, label: str, models: frozenset[str] | None, hide_option: str | None = None
 ) -> tuple[TelemetryEntityDescription, ...]:
     """Drive-unit sensors for one motor (Di*F, Di*REL, Di*RER); disabled by default."""
     temp = {
@@ -90,6 +93,7 @@ def _drive_unit(
             icon="mdi:rotate-right",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
         ),
         TelemetryEntityDescription(
             key=f"DiMotorCurrent{suffix}",
@@ -101,6 +105,7 @@ def _drive_unit(
             icon="mdi:current-dc",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
         ),
         TelemetryEntityDescription(
             key=f"DiTorqueActual{suffix}",
@@ -112,6 +117,7 @@ def _drive_unit(
             icon="mdi:engine",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
         ),
         TelemetryEntityDescription(
             key=f"DiVBat{suffix}",
@@ -123,12 +129,14 @@ def _drive_unit(
             icon="mdi:flash",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
         ),
         TelemetryEntityDescription(
             key=f"DiHeatsinkT{suffix}",
             name=f"{label} Heatsink Temp",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
             **temp,
         ),
         TelemetryEntityDescription(
@@ -136,6 +144,7 @@ def _drive_unit(
             name=f"{label} Inverter Temp",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
             **temp,
         ),
         TelemetryEntityDescription(
@@ -143,6 +152,7 @@ def _drive_unit(
             name=f"{label} Stator Temp",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
             **temp,
         ),
         TelemetryEntityDescription(
@@ -152,12 +162,13 @@ def _drive_unit(
             strip_prefix="DriveInverterState",
             entity_category=_DIAG,
             models=models,
+            hide_option=hide_option,
         ),
     )
 
 
 _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
-    *_drive_unit("F", "Front", None),
+    *_drive_unit("F", "Front", None, CONF_HIDE_FRONT_DRIVE_UNIT),
     *_drive_unit("REL", "Rear Left", _DUAL_REAR_MOTOR),
     *_drive_unit("RER", "Rear Right", _DUAL_REAR_MOTOR),
     TelemetryEntityDescription(
@@ -187,6 +198,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="Power Transfer Status",
         icon="mdi:transmission-tower-export",
         entity_category=_DIAG,
+        hide_option=CONF_HIDE_POWERSHARE,
     ),
     # --- Cybertruck: tonneau cover and Powershare ---
     TelemetryEntityDescription(
@@ -224,6 +236,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:timer-outline",
         models=_CYBERTRUCK,
+        hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
         key="PowershareInstantaneousPowerKW",
@@ -234,6 +247,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:transmission-tower-export",
         models=_CYBERTRUCK,
+        hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
         key="PowershareStatus",
@@ -241,6 +255,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:transmission-tower-export",
         strip_prefix="PowershareState",
         models=_CYBERTRUCK,
+        hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
         key="PowershareStopReason",
@@ -249,6 +264,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         strip_prefix="PowershareStopReasonStatus",
         entity_category=_DIAG,
         models=_CYBERTRUCK,
+        hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
         key="PowershareType",
@@ -257,6 +273,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         strip_prefix="PowershareTypeStatus",
         entity_category=_DIAG,
         models=_CYBERTRUCK,
+        hide_option=CONF_HIDE_POWERSHARE,
     ),
     # --- Semi ---
     *(

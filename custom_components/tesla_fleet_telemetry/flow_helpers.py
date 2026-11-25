@@ -26,6 +26,8 @@ from tesla_fleet_api.exceptions import TeslaFleetError
 
 from .const import (
     CONF_DOMAIN,
+    CONF_HIDE_FRONT_DRIVE_UNIT,
+    CONF_HIDE_POWERSHARE,
     CONF_MQTT_HOST,
     CONF_MQTT_PASSWORD,
     CONF_MQTT_PORT,
@@ -434,6 +436,12 @@ def build_options_schema(merged: dict[str, Any]) -> vol.Schema:
                 CONF_PROXY_VERIFY_SSL, default=bool(merged.get(CONF_PROXY_VERIFY_SSL, False))
             ): bool,
             vol.Optional(CONF_MQTT_TLS, default=bool(merged.get(CONF_MQTT_TLS, False))): bool,
+            vol.Optional(
+                CONF_HIDE_FRONT_DRIVE_UNIT, default=bool(merged.get(CONF_HIDE_FRONT_DRIVE_UNIT))
+            ): bool,
+            vol.Optional(
+                CONF_HIDE_POWERSHARE, default=bool(merged.get(CONF_HIDE_POWERSHARE))
+            ): bool,
         }
     )
 

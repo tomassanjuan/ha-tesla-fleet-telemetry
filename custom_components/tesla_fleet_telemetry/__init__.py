@@ -55,6 +55,7 @@ from .entity_registry import (
     _register_entity_registry_sync_listener,
     _resolved_required_fields,
     _sync_entity_registry_defaults,
+    remove_hidden_entities,
 )
 from .fleet_config import (
     PolicyState,
@@ -611,6 +612,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
 
     # --- Load platforms ---
     try:
+        remove_hidden_entities(hass, entry)
         model_at_setup = vehicle_model(hass, coordinator, vin)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         _sync_device_metadata(hass, entry, coordinator, vin)

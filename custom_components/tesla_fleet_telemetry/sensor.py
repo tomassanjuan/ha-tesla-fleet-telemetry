@@ -237,12 +237,13 @@ async def async_setup_entry(
     policy_state: PolicyState = entry_data.policy_state
 
     model = vehicle_model(hass, coordinator, vin)
+    options = {**entry.data, **entry.options}
     entities: list[SensorEntity] = [
         TelemetrySensor(coordinator, description, vin)
         for description in DESCRIPTIONS
         if not description.binary
         and not description.has_dedicated_entity
-        and description_applies(description, model)
+        and description_applies(description, model, options)
     ]
     entities.extend(
         DerivedTelemetrySensor(coordinator, description, vin)

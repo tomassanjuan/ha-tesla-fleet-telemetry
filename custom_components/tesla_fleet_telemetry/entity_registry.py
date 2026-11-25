@@ -17,6 +17,7 @@ from .const import (
 )
 from .descriptions import (
     DERIVED_SENSOR_UNIQUE_ID_SUFFIXES,
+    DESCRIPTIONS,
     ENTITY_FIELD_MAPPINGS,
     FIELD_DEFS,
     SUPPORTED_STREAMING_FIELDS,
@@ -79,6 +80,24 @@ def _enable_dependency_entities(
             changed,
         )
     return changed
+
+
+def remove_hidden_entities(hass: HomeAssistant, entry: ConfigEntry) -> int:
+    """Delete registry entries for entity groups the user chose to hide in options."""
+    options = {**entry.data, **entry.options}
+    hidden = {d.key for d in DESCRIPTIONS if d.hide_option and options.get(d.hide_option)}
+    if not hidden:
+        return 0
+    vin = entry.data[CONF_VIN]
+    registry = er.async_get(hass)
+    stale = [
+        e.entity_id
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if _unique_id_suffix(e.unique_id, vin) in hidden
+    ]
+    for entity_id in stale:
+        registry.async_remove(entity_id)
+    return len(stale)
 
 
 def _default_enabled_for_unique_id(unique_id: str, vin: str) -> bool | None:

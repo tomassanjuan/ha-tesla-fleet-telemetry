@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -91,8 +93,16 @@ def vehicle_model(hass: HomeAssistant, coordinator: TelemetryCoordinator, vin: s
     return "".join(ch for ch in model.lower() if ch.isalnum()) or None
 
 
-def description_applies(description: EntityDescription, model: str | None) -> bool:
-    """Whether a description is created for this model; unknown model hides restricted ones."""
+def description_applies(
+    description: EntityDescription, model: str | None, options: Mapping[str, Any] | None = None
+) -> bool:
+    """Whether a description is created: not user-hidden, and matching the vehicle model.
+
+    An unknown model hides model-restricted descriptions.
+    """
+    hide_option = getattr(description, "hide_option", None)
+    if hide_option and options and options.get(hide_option):
+        return False
     models = getattr(description, "models", None)
     return models is None or (model is not None and any(m in model for m in models))
 

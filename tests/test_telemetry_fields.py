@@ -251,3 +251,16 @@ async def test_vehicle_model_filters_descriptions(
     assert not description_applies(ct, model)
     assert not description_applies(FIELD_DEFS["DiStateREL"], model)
     assert description_applies(FIELD_DEFS["DiStateF"], model)
+
+
+async def test_hide_options_filter_descriptions(
+    hass: HomeAssistant, coordinator: TelemetryCoordinator
+) -> None:
+    coordinator.async_update_field("CarType", "cybertruck")
+    model = vehicle_model(hass, coordinator, TEST_VIN)
+    front, power = FIELD_DEFS["DiStateF"], FIELD_DEFS["PowershareStatus"]
+    assert description_applies(front, model, {}) and description_applies(power, model, {})
+    assert not description_applies(front, model, {"hide_front_drive_unit": True})
+    assert description_applies(power, model, {"hide_front_drive_unit": True})
+    assert not description_applies(power, model, {"hide_powershare": True})
+    assert description_applies(FIELD_DEFS["DiStateREL"], model, {"hide_powershare": True})
