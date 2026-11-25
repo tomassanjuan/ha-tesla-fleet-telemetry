@@ -44,6 +44,7 @@ from .const import (
     DEFAULT_MQTT_TOPIC_BASE,
     DEFAULT_TELEMETRY_MODE,
     DEFAULT_TELEMETRY_SERVER_ENDPOINT,
+    HIDE_DEFAULT,
     TELEMETRY_MODE_OPTIONS,
 )
 from .oauth2 import (
@@ -437,10 +438,11 @@ def build_options_schema(merged: dict[str, Any]) -> vol.Schema:
             ): bool,
             vol.Optional(CONF_MQTT_TLS, default=bool(merged.get(CONF_MQTT_TLS, False))): bool,
             vol.Optional(
-                CONF_HIDE_FRONT_DRIVE_UNIT, default=bool(merged.get(CONF_HIDE_FRONT_DRIVE_UNIT))
+                CONF_HIDE_FRONT_DRIVE_UNIT,
+                default=bool(merged.get(CONF_HIDE_FRONT_DRIVE_UNIT, HIDE_DEFAULT)),
             ): bool,
             vol.Optional(
-                CONF_HIDE_POWERSHARE, default=bool(merged.get(CONF_HIDE_POWERSHARE))
+                CONF_HIDE_POWERSHARE, default=bool(merged.get(CONF_HIDE_POWERSHARE, HIDE_DEFAULT))
             ): bool,
         }
     )

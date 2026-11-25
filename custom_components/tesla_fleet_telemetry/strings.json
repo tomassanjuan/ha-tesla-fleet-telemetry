@@ -121,8 +121,8 @@
           "mqtt_username": "Leave empty if your broker allows anonymous connections.",
           "mqtt_tls": "Connect with TLS; the broker certificate must be trusted by the system CA store.",
           "proxy_verify_ssl": "Enable only if the proxy uses a publicly trusted certificate. Leave off for the usual self-signed proxy certificate.",
-          "hide_front_drive_unit": "Tick on rear-wheel-drive cars: they have no front motor. Applies after the integration reloads; hidden entities are removed.",
-          "hide_powershare": "Tick if you do not use Powershare or a PCS2 power-share setup. Applies after the integration reloads; hidden entities are removed.",
+          "hide_front_drive_unit": "On by default. Leave ticked on rear-wheel-drive cars (no front motor); untick to show them. Applies after the integration reloads; hidden entities are removed.",
+          "hide_powershare": "On by default. Untick if you use Powershare or a PCS2 power-share setup. Applies after the integration reloads; hidden entities are removed.",
           "telemetry_mode": "Realtime ≈1 s, Normal ≈10 s, Low ≈30 s per field. Locks, doors and other binary states always stream at 1 s. Use the quietest mode that fits."
         }
       }

@@ -236,8 +236,9 @@ async def test_vehicle_model_filters_descriptions(
 ) -> None:
     ct, semi = FIELD_DEFS["TonneauPosition"], FIELD_DEFS["SemiCruiseActive"]
     assert vehicle_model(hass, coordinator, TEST_VIN) is None
+    show = {"hide_front_drive_unit": False}
     assert not description_applies(ct, None)  # unknown model hides restricted entities
-    assert description_applies(FIELD_DEFS["DiStateF"], None)  # unrestricted always shown
+    assert description_applies(FIELD_DEFS["DiStateF"], None, show)  # unrestricted always shown
 
     coordinator.async_update_field("CarType", "cybertruck")
     model = vehicle_model(hass, coordinator, TEST_VIN)
@@ -250,7 +251,7 @@ async def test_vehicle_model_filters_descriptions(
     model = vehicle_model(hass, coordinator, TEST_VIN)
     assert not description_applies(ct, model)
     assert not description_applies(FIELD_DEFS["DiStateREL"], model)
-    assert description_applies(FIELD_DEFS["DiStateF"], model)
+    assert description_applies(FIELD_DEFS["DiStateF"], model, show)
 
 
 async def test_hide_options_filter_descriptions(
@@ -259,10 +260,10 @@ async def test_hide_options_filter_descriptions(
     coordinator.async_update_field("CarType", "cybertruck")
     model = vehicle_model(hass, coordinator, TEST_VIN)
     front, power = FIELD_DEFS["DiStateF"], FIELD_DEFS["PowershareStatus"]
-    assert description_applies(front, model, {}) and description_applies(power, model, {})
-    assert not description_applies(front, model, {"hide_front_drive_unit": True})
-    assert description_applies(power, model, {"hide_front_drive_unit": True})
-    assert not description_applies(power, model, {"hide_powershare": True})
-    assert description_applies(power, "modely", {})  # Powershare is not Cybertruck-only
+    off = {"hide_front_drive_unit": False, "hide_powershare": False}
+    assert not description_applies(front, model, {}) and not description_applies(power, model)
+    assert description_applies(front, model, off) and description_applies(power, model, off)
+    assert not description_applies(front, model, {**off, "hide_front_drive_unit": True})
+    assert description_applies(power, "modely", off)  # Powershare is not Cybertruck-only
+    assert description_applies(FIELD_DEFS["DiStateREL"], model, {})
     assert not FIELD_DEFS["PowershareStatus"].entity_registry_enabled_default
-    assert description_applies(FIELD_DEFS["DiStateREL"], model, {"hide_powershare": True})

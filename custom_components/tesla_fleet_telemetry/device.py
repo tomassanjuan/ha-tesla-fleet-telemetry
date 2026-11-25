@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 
-from .const import DOMAIN
+from .const import DOMAIN, HIDE_DEFAULT
 from .coordinator import TelemetryCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ def description_applies(
     An unknown model hides model-restricted descriptions.
     """
     hide_option = getattr(description, "hide_option", None)
-    if hide_option and options and options.get(hide_option):
+    if hide_option and (options or {}).get(hide_option, HIDE_DEFAULT):
         return False
     models = getattr(description, "models", None)
     return models is None or (model is not None and any(m in model for m in models))

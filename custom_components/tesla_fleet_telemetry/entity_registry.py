@@ -13,6 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from .const import (
     CONF_VIN,
     DEVICE_METADATA_FIELDS,
+    HIDE_DEFAULT,
     MIN_AUTOMATIC_PUSH_INTERVAL_SECONDS,
 )
 from .descriptions import (
@@ -85,7 +86,9 @@ def _enable_dependency_entities(
 def remove_hidden_entities(hass: HomeAssistant, entry: ConfigEntry) -> int:
     """Delete registry entries for entity groups the user chose to hide in options."""
     options = {**entry.data, **entry.options}
-    hidden = {d.key for d in DESCRIPTIONS if d.hide_option and options.get(d.hide_option)}
+    hidden = {
+        d.key for d in DESCRIPTIONS if d.hide_option and options.get(d.hide_option, HIDE_DEFAULT)
+    }
     if not hidden:
         return 0
     vin = entry.data[CONF_VIN]
