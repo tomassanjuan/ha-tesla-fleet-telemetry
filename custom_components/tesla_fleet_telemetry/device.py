@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 
 from .const import DOMAIN
 from .coordinator import TelemetryCoordinator
@@ -72,6 +74,27 @@ def device_registry_metadata(
     model = _pretty_model(coordinator.get_field("CarType"))
     sw_version = _clean_vehicle_detail(coordinator.get_field("Version"), ("Version",))
     return vehicle_name, model, efficiency_package, sw_version
+
+
+def vehicle_model(hass: HomeAssistant, coordinator: TelemetryCoordinator, vin: str) -> str | None:
+    """Return the model as a lowercase alphanumeric token ("modely", "cybertruck"), or None.
+
+    Live CarType wins; the device registry model (written by _sync_device_metadata)
+    covers restarts before the first telemetry push arrives.
+    """
+    model = _pretty_model(coordinator.get_field("CarType"))
+    if model is None:
+        device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, vin)})
+        model = device.model if device else None
+    if not model:
+        return None
+    return "".join(ch for ch in model.lower() if ch.isalnum()) or None
+
+
+def description_applies(description: EntityDescription, model: str | None) -> bool:
+    """Whether a description is created for this model; unknown model hides restricted ones."""
+    models = getattr(description, "models", None)
+    return models is None or (model is not None and any(m in model for m in models))
 
 
 def build_device_info(coordinator: TelemetryCoordinator, vin: str) -> DeviceInfo:

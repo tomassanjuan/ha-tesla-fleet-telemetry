@@ -33,7 +33,7 @@ from .descriptions import (
     DerivedSensorEntityDescription,
     TelemetryEntityDescription,
 )
-from .device import build_device_info
+from .device import build_device_info, description_applies, vehicle_model
 from .entity_base import TelemetryEntity, telemetry_unique_id
 from .fleet_config import PolicyState
 
@@ -236,10 +236,13 @@ async def async_setup_entry(
     vin: str = entry_data.vin
     policy_state: PolicyState = entry_data.policy_state
 
+    model = vehicle_model(hass, coordinator, vin)
     entities: list[SensorEntity] = [
         TelemetrySensor(coordinator, description, vin)
         for description in DESCRIPTIONS
-        if not description.binary and not description.has_dedicated_entity
+        if not description.binary
+        and not description.has_dedicated_entity
+        and description_applies(description, model)
     ]
     entities.extend(
         DerivedTelemetrySensor(coordinator, description, vin)

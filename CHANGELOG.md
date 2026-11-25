@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New telemetry entities (all disabled by default): front, rear-left and rear-right drive-unit sensors, slave motor torque command, scheduled departure time, power transfer status, self-driving software version, Cybertruck tonneau and Powershare sensors, and Semi tire pressure, park brake, cruise, mass and port sensors.
+- Model-specific entities are created only for the matching vehicle, detected from the car type: Cybertruck-only, Semi-only, and rear-left/right motor sensors (Model S, Model X, Cybertruck). Until the model is known they are skipped, and the integration reloads once it is reported. Front-motor sensors can't be detected (no field reports AWD), so RWD cars still get them; leave them disabled.
 - Fixed the `Accessory Rail` binary sensor showing no icon: it used `mdi:rail`, which doesn't exist in Material Design Icons. It now uses `mdi:power-plug`.
 - Speed Limit number entity to set Speed Limit Mode's maximum speed (`speed_limit_set_limit`). It replaces the read-only "Current Speed Limit" sensor.
 - Removed the duplicate `Remote Start Active` binary sensor; the `Remote Start` lock already reports the same state. Delete the orphaned entity from the registry if it remains.

@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryError,
@@ -50,7 +50,7 @@ from .const import (
     WAKE_UP_SYNC_RECHECK_DELAY_SECONDS,
 )
 from .coordinator import TelemetryCoordinator
-from .device import device_registry_metadata
+from .device import device_registry_metadata, vehicle_model
 from .entity_registry import (
     _register_entity_registry_sync_listener,
     _resolved_required_fields,
@@ -611,8 +611,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  #
 
     # --- Load platforms ---
     try:
+        model_at_setup = vehicle_model(hass, coordinator, vin)
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         _sync_device_metadata(hass, entry, coordinator, vin)
+        if model_at_setup is None:
+            # Model-specific entities were skipped; reload once CarType reveals the model.
+            @callback
+            def _reload_on_model(_field: str, value: Any) -> None:
+                if value is not None:
+                    hass.config_entries.async_schedule_reload(entry.entry_id)
+
+            entry.async_on_unload(coordinator.async_add_field_listener("CarType", _reload_on_model))
         _sync_entry_title(hass, entry, vin)
 
         # Enforce default enabled/disabled policy after entities are created.
@@ -692,8 +701,7 @@ async def _async_run_setup_bootstrap(
             push_result = await push_entry_telemetry_config(reason="setup_retry")
             if not push_result.get("pushed") and not push_result.get("skipped"):
                 _LOGGER.warning(
-                    "fleet_telemetry_config push still failing for %s "
-                    "— leaving integration loaded",
+                    "fleet_telemetry_config push still failing for %s — leaving integration loaded",
                     vin,
                 )
 
