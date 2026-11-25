@@ -234,7 +234,7 @@ def test_model_specific_fields_are_streamable() -> None:
 async def test_vehicle_model_filters_descriptions(
     hass: HomeAssistant, coordinator: TelemetryCoordinator
 ) -> None:
-    ct, semi = FIELD_DEFS["PowershareStatus"], FIELD_DEFS["SemiCruiseActive"]
+    ct, semi = FIELD_DEFS["TonneauPosition"], FIELD_DEFS["SemiCruiseActive"]
     assert vehicle_model(hass, coordinator, TEST_VIN) is None
     assert not description_applies(ct, None)  # unknown model hides restricted entities
     assert description_applies(FIELD_DEFS["DiStateF"], None)  # unrestricted always shown
@@ -263,4 +263,6 @@ async def test_hide_options_filter_descriptions(
     assert not description_applies(front, model, {"hide_front_drive_unit": True})
     assert description_applies(power, model, {"hide_front_drive_unit": True})
     assert not description_applies(power, model, {"hide_powershare": True})
+    assert description_applies(power, "modely", {})  # Powershare is not Cybertruck-only
+    assert FIELD_DEFS["PowershareStatus"].entity_registry_enabled_default
     assert description_applies(FIELD_DEFS["DiStateREL"], model, {"hide_powershare": True})

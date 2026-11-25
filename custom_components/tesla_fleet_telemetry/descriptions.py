@@ -198,9 +198,10 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="Power Transfer Status",
         icon="mdi:transmission-tower-export",
         entity_category=_DIAG,
+        entity_registry_enabled_default=True,
         hide_option=CONF_HIDE_POWERSHARE,
     ),
-    # --- Cybertruck: tonneau cover and Powershare ---
+    # --- Cybertruck: tonneau cover ---
     TelemetryEntityDescription(
         key="TonneauOpenPercent",
         name="Tonneau Open",
@@ -227,6 +228,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         entity_category=_DIAG,
         models=_CYBERTRUCK,
     ),
+    # --- Powershare (Cybertruck, and Model 3/Y from 2026): hide via options ---
     TelemetryEntityDescription(
         key="PowershareHoursLeft",
         name="Powershare Hours Left",
@@ -235,7 +237,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         icon="mdi:timer-outline",
-        models=_CYBERTRUCK,
+        entity_registry_enabled_default=True,
         hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
@@ -246,7 +248,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         icon="mdi:transmission-tower-export",
-        models=_CYBERTRUCK,
+        entity_registry_enabled_default=True,
         hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
@@ -254,7 +256,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         name="Powershare Status",
         icon="mdi:transmission-tower-export",
         strip_prefix="PowershareState",
-        models=_CYBERTRUCK,
+        entity_registry_enabled_default=True,
         hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
@@ -263,7 +265,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:transmission-tower-off",
         strip_prefix="PowershareStopReasonStatus",
         entity_category=_DIAG,
-        models=_CYBERTRUCK,
+        entity_registry_enabled_default=True,
         hide_option=CONF_HIDE_POWERSHARE,
     ),
     TelemetryEntityDescription(
@@ -272,7 +274,7 @@ _MODEL_DESCRIPTIONS: tuple[TelemetryEntityDescription, ...] = (
         icon="mdi:home-lightning-bolt",
         strip_prefix="PowershareTypeStatus",
         entity_category=_DIAG,
-        models=_CYBERTRUCK,
+        entity_registry_enabled_default=True,
         hide_option=CONF_HIDE_POWERSHARE,
     ),
     # --- Semi ---
